@@ -1,3 +1,4 @@
+-- F
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
@@ -1680,7 +1681,7 @@ task.spawn(function()
 
         local interval = tonumber(Configs.TrowelInterval) or 0
         local waitDelay = (interval <= 0) and 0.1 or interval
-
+        -- [[ SYSTEM AUTOMATION HIGH-SPEED TROWEL LOOP - PART 2 ]]
         for _, plant in ipairs(plantsFolder:GetChildren()) do
             if not Configs.AutoTrowelToggleState then break end
             
