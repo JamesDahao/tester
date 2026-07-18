@@ -1,4 +1,3 @@
--- f
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
@@ -1638,92 +1637,89 @@ task.spawn(function()
         end
     end)
 
-    task.spawn(function()
-        while true do
-            task.wait(0.1)
-            local Configs = _G.DecodeAPI and _G.DecodeAPI.Configs
-            if type(Configs) ~= "table" then continue end
-            if not Configs.AutoTrowelToggleState or not Configs.TrowelSavedCFrame then continue end
+    while true do
+        task.wait(0.1)
+        local Configs = _G.DecodeAPI and _G.DecodeAPI.Configs
+        if type(Configs) ~= "table" then continue end
+        if not Configs.AutoTrowelToggleState or not Configs.TrowelSavedCFrame then continue end
 
-            local Character = localPlayer.Character
-            local Backpack = localPlayer:FindFirstChild("Backpack")
-            if not Character or not Backpack then continue end
+        local Character = localPlayer.Character
+        local Backpack = localPlayer:FindFirstChild("Backpack")
+        if not Character or not Backpack then continue end
 
-            local ownPlotId = localPlayer:GetAttribute("PlotId")
-            local gardens = workspace:FindFirstChild("Gardens")
-            if not gardens then continue end
+        local ownPlotId = localPlayer:GetAttribute("PlotId")
+        local gardens = workspace:FindFirstChild("Gardens")
+        if not gardens then continue end
 
-            local myPlot = nil
-            if ownPlotId then
-                myPlot = gardens:FindFirstChild("Plot" .. tostring(ownPlotId))
-            end
-            if not myPlot then
-                for _, plot in ipairs(gardens:GetChildren()) do
-                    if string.find(string.lower(plot.Name), string.lower(localPlayer.Name), 1, true) then
-                        myPlot = plot
-                        break
-                    end
-                end
-            end
-            if not myPlot then continue end
-
-            local plantsFolder = myPlot:FindFirstChild("Plants")
-            if not plantsFolder then continue end
-
-            local plotAnchor = myPlot.PrimaryPart or myPlot:FindFirstChild("Floor") or myPlot:FindFirstChildOfClass("BasePart") or myPlot:FindFirstChildOfClass("MeshPart")
-            if not plotAnchor then continue end
-            
-            local successPos, targetWorldPos = pcall(function()
-                -- Fixed unpack layout formatting to natively process the array entries
-                local unpackedCFrame = CFrame.new(unpack(Configs.TrowelSavedCFrame))
-                local basePos = plotAnchor.CFrame:ToWorldSpace(unpackedCFrame).Position
-                return Vector3.new(basePos.X, basePos.Y - 3.2, basePos.Z)
-            end)
-            if not successPos or not targetWorldPos then continue end
-
-            local interval = tonumber(Configs.TrowelInterval) or 0
-            local waitDelay = (interval <= 0) and 0.1 or interval
-
-            for _, plant in ipairs(plantsFolder:GetChildren()) do
-                if not Configs.AutoTrowelToggleState then break end
-                
-                local isReady = plant:GetAttribute("PlantGrowthReady")
-                local plantId = plant:GetAttribute("PlantId")
-                local seedName = plant:GetAttribute("SeedName")
-                if not isReady or not plantId or not seedName then continue end
-
-                if Configs.TrowelPlantsFilter and table.find(Configs.TrowelPlantsFilter, tostring(seedName)) then
-                    local primaryPart = plant.PrimaryPart or plant:FindFirstChildOfClass("BasePart")
-                    local currentPos = primaryPart and primaryPart.Position
-                    
-                    if not currentPos or (currentPos - targetWorldPos).Magnitude <= 1.5 then continue end
-
-                    local trowelTool = Character:FindFirstChild("Trowel")
-                    if not trowelTool then
-                        trowelTool = Backpack:FindFirstChild("Trowel")
-                        if trowelTool then
-                            trowelTool.Parent = Character
-                            task.wait(0.05)
-                        end
-                    end
-
-                    pcall(function()
-                        if TrowelRemote then
-                            if typeof(TrowelRemote) == "table" and type(TrowelRemote.Fire) == "function" then
-                                TrowelRemote:Fire(plantId, targetWorldPos, 0)
-                            elseif typeof(TrowelRemote) == "userdata" or typeof(TrowelRemote) == "Instance" then
-                                TrowelRemote:FireServer(plantId, targetWorldPos, 0)
-                            elseif type(TrowelRemote) == "function" then
-                                TrowelRemote(plantId, targetWorldPos, 0)
-                            end
-                        end
-                    end)
-
-                    task.wait(waitDelay)
+        local myPlot = nil
+        if ownPlotId then
+            myPlot = gardens:FindFirstChild("Plot" .. tostring(ownPlotId))
+        end
+        if not myPlot then
+            for _, plot in ipairs(gardens:GetChildren()) do
+                if string.find(string.lower(plot.Name), string.lower(localPlayer.Name), 1, true) then
+                    myPlot = plot
+                    break
                 end
             end
         end
-    end)
+        if not myPlot then continue end
+
+        local plantsFolder = myPlot:FindFirstChild("Plants")
+        if not plantsFolder then continue end
+
+        local plotAnchor = myPlot.PrimaryPart or myPlot:FindFirstChild("Floor") or myPlot:FindFirstChildOfClass("BasePart") or myPlot:FindFirstChildOfClass("MeshPart")
+        if not plotAnchor then continue end
+        
+        local successPos, targetWorldPos = pcall(function()
+            local unpackedCFrame = CFrame.new(unpack(Configs.TrowelSavedCFrame))
+            local basePos = plotAnchor.CFrame:ToWorldSpace(unpackedCFrame).Position
+            return Vector3.new(basePos.X, basePos.Y - 3.2, basePos.Z)
+        end)
+        if not successPos or not targetWorldPos then continue end
+
+        local interval = tonumber(Configs.TrowelInterval) or 0
+        local waitDelay = (interval <= 0) and 0.1 or interval
+
+        for _, plant in ipairs(plantsFolder:GetChildren()) do
+            if not Configs.AutoTrowelToggleState then break end
+            
+            local isReady = plant:GetAttribute("PlantGrowthReady")
+            local plantId = plant:GetAttribute("PlantId")
+            local seedName = plant:GetAttribute("SeedName")
+            if not isReady or not plantId or not seedName then continue end
+
+            if Configs.TrowelPlantsFilter and table.find(Configs.TrowelPlantsFilter, tostring(seedName)) then
+                local primaryPart = plant.PrimaryPart or plant:FindFirstChildOfClass("BasePart")
+                local currentPos = primaryPart and primaryPart.Position
+                
+                if not currentPos or (currentPos - targetWorldPos).Magnitude <= 1.5 then continue end
+
+                local trowelTool = Character:FindFirstChild("Trowel")
+                if not trowelTool then
+                    trowelTool = Backpack:FindFirstChild("Trowel")
+                    if trowelTool then
+                        trowelTool.Parent = Character
+                        task.wait(0.05)
+                    end
+                end
+
+                pcall(function()
+                    if TrowelRemote then
+                        if typeof(TrowelRemote) == "table" and type(TrowelRemote.Fire) == "function" then
+                            TrowelRemote:Fire(plantId, targetWorldPos, 0)
+                        elseif typeof(TrowelRemote) == "userdata" or typeof(TrowelRemote) == "Instance" then
+                            TrowelRemote:FireServer(plantId, targetWorldPos, 0)
+                        elseif type(TrowelRemote) == "function" then
+                            TrowelRemote(plantId, targetWorldPos, 0)
+                        end
+                    end
+                end)
+
+                task.wait(waitDelay)
+            end
+        end
+    end
 end)
 
 print("Decode: Function Loaded.")
