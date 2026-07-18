@@ -1,4 +1,3 @@
---1
 local Decode = {}
 
 local CoreGui = game:GetService("CoreGui")
@@ -148,6 +147,21 @@ function Decode:GetAssetCategory(categoryName)
             if child:IsA("Folder") or child:IsA("Model") or child:IsA("Tool") or child:IsA("ModuleScript") then 
                 table.insert(items, child.Name) 
             end
+        end
+    end
+    table.sort(items)
+    return items
+end
+
+function Decode:GetGameSeeds()
+    local items = {}
+    local repStorage = game:GetService("ReplicatedStorage")
+    local assets = repStorage:FindFirstChild("Assets")
+    local folder = assets and assets:FindFirstChild("Seeds")
+    
+    if folder then
+        for _, child in pairs(folder:GetChildren()) do
+            table.insert(items, child.Name)
         end
     end
     table.sort(items)
@@ -1501,7 +1515,7 @@ task.spawn(function()
 
     local mailboxFruitList = Decode:GetAssetCategory("Plants")
     local mailboxPetList = Decode:GetAssetCategory("Pets")
-    local mailboxSeedsList = Decode:GetAssetCategory("Seeds")
+    local mailboxSeedsList = Decode:GetGameSeeds()
     local mailboxSprinklersList = Decode:GetAssetCategory("Sprinklers")
     local mailboxCansList = Decode:GetAssetCategory("WateringCans")
     local mailboxCratesList = Decode:GetAssetCategory("Crates")
