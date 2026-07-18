@@ -746,7 +746,6 @@ task.spawn(function()
                         
                         local uidLookup = network.Mailbox.LookupPlayer:Fire(targetUser)
                         if not uidLookup or uidLookup <= 0 then
-                            if _G.PostMailboxTerminalAlert then _G.PostMailboxTerminalAlert("Mailbox", "Error: Invalid Player!", true) end
                             return
                         end
                         
