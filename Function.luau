@@ -1,4 +1,3 @@
--- test
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
@@ -1620,6 +1619,7 @@ task.spawn(function()
     end
 end)
 
+-- [[ NEW HIGH-EFFICIENCY TROWEL AUTOMATION MODULE - PART 1 ]]
 task.spawn(function()
     local gameService = game
     local replicatedStorage = gameService:GetService("ReplicatedStorage")
@@ -1652,6 +1652,7 @@ task.spawn(function()
         local gardensFolder = workspace:FindFirstChild("Gardens")
         if not gardensFolder then continue end
 
+        -- Fast matrix lookup identifier
         local myPlot = nil
         for _, plot in ipairs(gardensFolder:GetChildren()) do
             local idChild = plot:FindFirstChild("OwnerUserId")
@@ -1670,6 +1671,7 @@ task.spawn(function()
             end
         end
         
+        -- High speed proximity distance lookup fallback tracking mechanism
         if not myPlot then
             local hrpPos = HumanoidRootPart.Position
             local closestDist = math.huge
@@ -1692,6 +1694,7 @@ task.spawn(function()
         local plotAnchor = myPlot.PrimaryPart or myPlot:FindFirstChild("Floor") or myPlot:FindFirstChildOfClass("BasePart") or myPlot:FindFirstChildOfClass("MeshPart")
         if not plotAnchor then continue end
         
+        -- Translates matrix coordinate components completely error-free
         local successPos, calculatedTargetCFrame = pcall(function()
             local savedMatrix = CFrame.new(unpack(Configs.TrowelSavedCFrame))
             return plotAnchor.CFrame:ToWorldSpace(savedMatrix)
@@ -1700,17 +1703,26 @@ task.spawn(function()
 
         local interval = tonumber(Configs.TrowelInterval) or 0
         local waitDelay = (interval <= 0) and 0.1 or interval
+        -- [[ NEW HIGH-EFFICIENCY TROWEL AUTOMATION MODULE - PART 2 ]]
         for _, plant in ipairs(plantsFolder:GetChildren()) do
             if not Configs.AutoTrowelToggleState then break end
             
+            -- Re-integrated your exact required growth tag constraint check
+            local isReady = plant:GetAttribute("PlantGrowthReady")
             local plantId = plant:GetAttribute("PlantId") or plant:GetAttribute("Id")
             local seedName = plant:GetAttribute("SeedName") or plant:GetAttribute("PlantName") or plant.Name
-            if not plantId or not seedName then continue end
+            
+            if not isReady or not plantId or not seedName then continue end
 
+            -- Clean string matching strips spaces, dashes, and underscores to sync UI text perfectly
             local isWhitelisted = false
             if Configs.TrowelPlantsFilter and type(Configs.TrowelPlantsFilter) == "table" then
+                local cleanSeedName = tostring(seedName):lower():gsub("%s+", ""):gsub("_+", ""):gsub("-+", "")
+                
                 for _, filterName in ipairs(Configs.TrowelPlantsFilter) do
-                    if tostring(filterName) == tostring(seedName) or tostring(seedName):find(tostring(filterName), 1, true) then
+                    local cleanFilterName = tostring(filterName):lower():gsub("%s+", ""):gsub("_+", ""):gsub("-+", "")
+                    
+                    if cleanSeedName == cleanFilterName or cleanSeedName:find(cleanFilterName, 1, true) or cleanFilterName:find(cleanSeedName, 1, true) then
                         isWhitelisted = true
                         break
                     end
@@ -1722,9 +1734,10 @@ task.spawn(function()
             local currentPos = primaryPart and primaryPart.Position
             local targetWorldPos = calculatedTargetCFrame.Position
             
+            -- Validation check to skip plants already properly positioned
             if not currentPos or (currentPos - targetWorldPos).Magnitude <= 1.5 then continue end
 
-            -- Automated tool presence activation validator handler
+            -- Automated tool equipping validation
             local trowelTool = Character:FindFirstChild("Trowel")
             if not trowelTool then
                 trowelTool = Backpack:FindFirstChild("Trowel")
