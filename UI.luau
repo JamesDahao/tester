@@ -1,4 +1,4 @@
--- Test1
+--Test 1
 local Decode = {}
 
 local CoreGui = game:GetService("CoreGui")
