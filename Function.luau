@@ -1,4 +1,3 @@
---1
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
@@ -6,6 +5,8 @@ local TweenService = game:GetService("TweenService")
 
 local LocalPlayer = Players.LocalPlayer
 local cachedGardenSyncController = nil
+local currentLockedTarget = nil
+local currentLockedPrompt = nil
 
 task.spawn(function()
     local playerScripts = LocalPlayer:WaitForChild("PlayerScripts", 10)
@@ -455,13 +456,13 @@ local function processAutoWalkPurchaseLoop()
                         
                         local shouldTargetPet = false
                         
-                        -- Enforce conditional selection routing rules
-                        if petFilterActive and sizeTypeFilterActive then
-                            if matchesPet and matchesSizeOrType then shouldTargetPet = true end
-                        elseif petFilterActive then
-                            if matchesPet then shouldTargetPet = true end
-                        elseif sizeTypeFilterActive then
-                            if matchesSizeOrType then shouldTargetPet = true end
+                        if petFilterActive or sizeTypeFilterActive then
+                            local matchesPetCondition = petFilterActive and matchesPet
+                            local matchesSizeCondition = sizeTypeFilterActive and matchesSizeOrType
+                            
+                            if matchesPetCondition or matchesSizeCondition then 
+                                shouldTargetPet = true 
+                            end
                         else
                             shouldTargetPet = false
                         end
@@ -572,6 +573,155 @@ end
 
 task.spawn(function()
     pcall(processAutoWalkPurchaseLoop)
+end)
+
+task.spawn(function()
+    while true do
+        local Configs = _G.DecodeAPI and _G.DecodeAPI.Configs
+        if Configs and Configs.AutoCollectEventSeeds == true then
+            pcall(function()
+                local mapFolder = workspace:FindFirstChild("Map")
+                local clientFolder = mapFolder and mapFolder:FindFirstChild("SeedPackSpawnClient")
+                local serverLocations = mapFolder and mapFolder:FindFirstChild("SeedPackSpawnServerLocations")
+                
+                if not clientFolder or not serverLocations then return end
+                
+                local localCharacter = LocalPlayer.Character
+                local localRoot = localCharacter and localCharacter:FindFirstChild("HumanoidRootPart")
+                local localHumanoid = localCharacter and localCharacter:FindFirstChildOfClass("Humanoid")
+                
+                if not localRoot or not localHumanoid or localHumanoid.Health <= 0 then return end
+                
+                local stillValid = false
+                if currentLockedTarget and currentLockedTarget.Parent and currentLockedPrompt and currentLockedPrompt.Parent then
+                    stillValid = true
+                else
+                    currentLockedTarget = nil
+                    currentLockedPrompt = nil
+                end
+                
+                if not stillValid then
+                    local activeDrops = clientFolder:GetChildren()
+                    local closestDistance = math.huge
+                    
+                    for idx = 1, #activeDrops do
+                        local container = activeDrops[idx]
+                        local visualPart = container:IsA("BasePart") and container or container:FindFirstChildOfClass("BasePart", true)
+                        
+                        if visualPart then
+                            local dropPosition = visualPart.Position
+                            local distanceToPlayer = (dropPosition - localRoot.Position).Magnitude
+                            
+                            if distanceToPlayer < closestDistance then
+                                local closestPrompt = nil
+                                local shortestPromptDistance = math.huge
+                                
+                                for _, locationPart in ipairs(serverLocations:GetChildren()) do
+                                    if locationPart:IsA("BasePart") then
+                                        local prompt = locationPart:FindFirstChildOfClass("ProximityPrompt")
+                                        if prompt then
+                                            local distanceToPrompt = (locationPart.Position - dropPosition).Magnitude
+                                            if distanceToPrompt < shortestPromptDistance and distanceToPrompt < 8 then
+                                                shortestPromptDistance = distanceToPrompt
+                                                closestPrompt = prompt
+                                            end
+                                        end
+                                    end
+                                end
+                                
+                                if closestPrompt then
+                                    closestDistance = distanceToPlayer
+                                    currentLockedTarget = visualPart
+                                    currentLockedPrompt = closestPrompt
+                                end
+                            end
+                        end
+                    end
+                end
+
+                if currentLockedTarget and currentLockedPrompt then
+                    local targetPosition = currentLockedTarget.Position
+                    local distance = (targetPosition - localRoot.Position).Magnitude
+                    local speed = tonumber(Configs.CollectTweenSpeed) or 16
+                    
+                    if distance > 3 then
+                        if speed > 50 then
+                            localRoot.CFrame = CFrame.new(targetPosition)
+                            task.wait(0.05)
+                        else
+                            if speed <= 5 then speed = 16 end
+                            local startCFrame = localRoot.CFrame
+                            local targetCFrame = CFrame.new(targetPosition)
+                            local duration = distance / speed
+                            local elapsed = 0
+                            
+                            local antiGravityConn
+                            antiGravityConn = game:GetService("RunService").PostSimulation:Connect(function()
+                                if localRoot then 
+                                    localRoot.AssemblyLinearVelocity = Vector3.new(0, 0, 0) 
+                                end
+                            end)
+                            
+                            while elapsed < duration and Configs.AutoCollectEventSeeds == true and localHumanoid.Health > 0 do
+                                if not currentLockedTarget or not currentLockedTarget.Parent or not currentLockedPrompt or not currentLockedPrompt.Parent then
+                                    currentLockedTarget = nil
+                                    currentLockedPrompt = nil
+                                    break
+                                end
+                                
+                                elapsed = elapsed + task.wait()
+                                local alpha = math.clamp(elapsed / duration, 0, 1)
+                                localRoot.CFrame = startCFrame:Lerp(targetCFrame, alpha)
+                            end
+                            
+                            if antiGravityConn then antiGravityConn:Disconnect() end
+                        end
+                    end
+
+                    if currentLockedTarget and currentLockedTarget.Parent and currentLockedPrompt and currentLockedPrompt.Parent and Configs.AutoCollectEventSeeds == true and localHumanoid.Health > 0 then
+                        currentLockedPrompt.RequiresLineOfSight = false
+                        currentLockedPrompt.ClickablePrompt = true
+                        
+                        local oldHold = currentLockedPrompt.HoldDuration
+                        currentLockedPrompt.HoldDuration = 0
+                        
+                        currentLockedPrompt.Enabled = false
+                        task.wait()
+                        currentLockedPrompt.Enabled = true
+
+                        local maximumRetryTimeout = 0
+                        while currentLockedTarget and currentLockedTarget.Parent and currentLockedPrompt and currentLockedPrompt.Parent and maximumRetryTimeout < 15 do
+                            if Configs.AutoCollectEventSeeds ~= true or localHumanoid.Health <= 0 then break end
+                            
+                            local rawEnv = getfenv()
+                            local triggerPrompt = rawEnv["fireproximityprompt"] or _G.fireproximityprompt
+                            if triggerPrompt then
+                                triggerPrompt(currentLockedPrompt, 1)
+                            else
+                                currentLockedPrompt:InputHoldBegin()
+                                task.wait(0.01)
+                                currentLockedPrompt:InputHoldEnd()
+                            end
+                            
+                            maximumRetryTimeout = maximumRetryTimeout + 1
+                            task.wait(0.03)
+                        end
+                        
+                        pcall(function() currentLockedPrompt.HoldDuration = oldHold end)
+                        
+                        currentLockedTarget = nil
+                        currentLockedPrompt = nil
+                        task.wait(0.1) 
+                    end
+                end
+            end)
+            task.wait(0.05)
+        else
+            currentLockedTarget = nil
+            currentLockedPrompt = nil
+            task.wait(1.0)
+        end
+    end
 end)
 
 print("Decode: Function Loaded.")
