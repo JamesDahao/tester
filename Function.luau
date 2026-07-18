@@ -1,4 +1,3 @@
---2
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
@@ -870,12 +869,11 @@ task.spawn(function()
                     end
                 end
             end)
-            
             local sleepDuration = tonumber(Configs.MailSendInterval) or 5
             if processingSuccess then
                 task.wait(math.max(sleepDuration, 0.5))
             else
-                task.wait(1.0)
+                task.wait(math.max(sleepDuration, 1.0))
             end
         else
             task.wait(1.0)
