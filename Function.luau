@@ -1,3 +1,4 @@
+--1
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
@@ -416,7 +417,6 @@ local function processAutoWalkPurchaseLoop()
                             local rawSize = companionRefInstance:GetAttribute("PetSize") or companionRefInstance:GetAttribute("Size")
                             local rawType = companionRefInstance:GetAttribute("PetType") or companionRefInstance:GetAttribute("Type")
                             
-                            -- Ignore the baseline fallback strings to optimize checking speed
                             if rawSize and tostring(rawSize) ~= "" and tostring(rawSize):lower() ~= "normal" then 
                                 currentSize = tostring(rawSize):lower() 
                             end
@@ -445,7 +445,8 @@ local function processAutoWalkPurchaseLoop()
                         if sizeTypeFilterActive then
                             for _, allowedCriteria in ipairs(Configs.SelectedPetSizeFilter) do
                                 local lowerCriteria = tostring(allowedCriteria):lower()
-                                if currentSize == lowerCriteria or currentType == lowerCriteria then
+                                -- Completely case-insensitive check to guarantee matching across obfuscation boundaries
+                                if currentSize:lower() == lowerCriteria or currentType:lower() == lowerCriteria then
                                     matchesSizeOrType = true
                                     break
                                 end
@@ -454,6 +455,7 @@ local function processAutoWalkPurchaseLoop()
                         
                         local shouldTargetPet = false
                         
+                        -- Enforce conditional selection routing rules
                         if petFilterActive and sizeTypeFilterActive then
                             if matchesPet and matchesSizeOrType then shouldTargetPet = true end
                         elseif petFilterActive then
@@ -461,7 +463,7 @@ local function processAutoWalkPurchaseLoop()
                         elseif sizeTypeFilterActive then
                             if matchesSizeOrType then shouldTargetPet = true end
                         else
-                            shouldTargetPet = true
+                            shouldTargetPet = false
                         end
                         
                         if shouldTargetPet then
