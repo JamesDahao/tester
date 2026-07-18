@@ -1,4 +1,4 @@
---1
+--2
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
@@ -729,12 +729,14 @@ task.spawn(function()
     while true do
         local Configs = _G.DecodeAPI and _G.DecodeAPI.Configs
         if Configs and Configs.SendMailEnabled == true then
+            local processingSuccess = false
+            
             pcall(function()
                 local targetUser = tostring(Configs.MailTargetUser or ""):gsub("%s+", "")
                 local maxQuantity = math.floor(tonumber(Configs.MailSendQuantity) or 1)
                 
-                if _G.PostMailboxTerminalAlert then 
-                    _G.PostMailboxTerminalAlert("Mailbox", "Error: Username Is Null!", true) 
+                if targetUser == "" or targetUser == "username" or targetUser == "@Username" then
+                    return
                 end
                 
                 local sharedMod = ReplicatedStorage:FindFirstChild("SharedModules")
@@ -745,9 +747,7 @@ task.spawn(function()
                         
                         local uidLookup = network.Mailbox.LookupPlayer:Fire(targetUser)
                         if not uidLookup or uidLookup <= 0 then
-                            if _G.PostMailboxTerminalAlert then 
-                                _G.PostMailboxTerminalAlert("Mailbox", "Error: Invalid Player!", true) 
-                            end
+                            if _G.PostMailboxTerminalAlert then _G.PostMailboxTerminalAlert("Mailbox", "Error: Invalid Player!", true) end
                             return
                         end
                         
@@ -855,11 +855,15 @@ task.spawn(function()
                             end
                             if targetItemToProcess and #itemsToBatch > 0 then break end
                         end
+                        
                         if not targetItemToProcess or #itemsToBatch == 0 then return end
                         
                         local batchSuccess, responseMsg = network.Mailbox.SendBatch:Fire(uidLookup, itemsToBatch, "")
                         if batchSuccess then
-                            if _G.PostMailboxTerminalAlert then _G.PostMailboxTerminalAlert("Mailbox", "Dispatched Bulk Batch (" .. tostring(currentBatchCount) .. "x) successfully!", false) end
+                            processingSuccess = true
+                            if _G.PostMailboxTerminalAlert then
+                                _G.PostMailboxTerminalAlert("Mailbox", "Sent " .. tostring(currentBatchCount) .. "x " .. tostring(targetItemToProcess and targetItemToProcess.Name or "Items") .. " successfully!", false) 
+                            end
                         else
                             if _G.PostMailboxTerminalAlert then _G.PostMailboxTerminalAlert("Mailbox", tostring(responseMsg or "Failed"), true) end
                         end
@@ -868,7 +872,11 @@ task.spawn(function()
             end)
             
             local sleepDuration = tonumber(Configs.MailSendInterval) or 5
-            task.wait(math.max(sleepDuration, 0.5))
+            if processingSuccess then
+                task.wait(math.max(sleepDuration, 0.5))
+            else
+                task.wait(1.0)
+            end
         else
             task.wait(1.0)
         end
