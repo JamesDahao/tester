@@ -1,4 +1,4 @@
---1
+--2
 local Decode = {}
 
 local CoreGui = game:GetService("CoreGui")
@@ -161,23 +161,29 @@ function Decode:GetPetTypesAndSizes()
     local repStorage = game:GetService("ReplicatedStorage")
     local sharedData = repStorage:FindFirstChild("SharedData")
     
-    local typeMod = sharedData and sharedData:FindFirstChild("PetTypes")
-    if typeMod then
-        for _, child in pairs(typeMod:GetChildren()) do
-            if child:IsA("ModuleScript") or child:IsA("Folder") then
-                table.insert(combinedList, child.Name)
+    pcall(function()
+        local sizeMod = sharedData and sharedData:FindFirstChild("PetSizes")
+        if sizeMod and sizeMod:IsA("ModuleScript") then
+            local data = require(sizeMod)
+            if type(data) == "table" and data.Scales then
+                for sizeName, _ in pairs(data.Scales) do
+                    table.insert(combinedList, tostring(sizeName))
+                end
             end
         end
-    end
+    end)
     
-    local sizeMod = sharedData and sharedData:FindFirstChild("PetSizes")
-    if sizeMod then
-        for _, child in pairs(sizeMod:GetChildren()) do
-            if child:IsA("ModuleScript") or child:IsA("Folder") then
-                table.insert(combinedList, child.Name)
+    pcall(function()
+        local typeMod = sharedData and sharedData:FindFirstChild("PetTypes")
+        if typeMod and typeMod:IsA("ModuleScript") then
+            local data = require(typeMod)
+            if type(data) == "table" and data.Registry then
+                for typeName, _ in pairs(data.Registry) do
+                    table.insert(combinedList, tostring(typeName))
+                end
             end
         end
-    end
+    end)
 
     table.sort(combinedList)
     return combinedList
