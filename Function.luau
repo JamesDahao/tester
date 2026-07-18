@@ -1,3 +1,4 @@
+--jdv
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
@@ -719,6 +720,183 @@ task.spawn(function()
         else
             currentLockedTarget = nil
             currentLockedPrompt = nil
+            task.wait(1.0)
+        end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        local Configs = _G.DecodeAPI and _G.DecodeAPI.Configs
+        if Configs and Configs.SendMailEnabled == true then
+            pcall(function()
+                local targetUser = tostring(Configs.MailTargetUser or ""):gsub("%s+", "")
+                local maxQuantity = math.floor(tonumber(Configs.MailSendQuantity) or 1)
+                
+                if targetUser == "" or targetUser == "username" then
+                    if _G.PostMailboxTerminalAlert then _G.PostMailboxTerminalAlert("Error: Username Is Null!", true) end
+                    return
+                end
+                
+                local sharedMod = ReplicatedStorage:FindFirstChild("SharedModules")
+                local networkingMod = sharedMod and sharedMod:FindFirstChild("Networking")
+                if networkingMod then
+                    local netSuccess, network = pcall(require, networkingMod)
+                    if netSuccess and network and network.Mailbox and network.Mailbox.LookupPlayer and network.Mailbox.SendBatch then
+                        
+                        local uidLookup = network.Mailbox.LookupPlayer:Fire(targetUser)
+                        if not uidLookup or uidLookup <= 0 then
+                            if _G.PostMailboxTerminalAlert then _G.PostMailboxTerminalAlert("Error: Invalid Player!", true) end
+                            return
+                        end
+                        
+                        local targetItemToProcess = nil
+                        local itemsToBatch = {}
+                        local currentBatchCount = 0
+                        
+                        local scanningBlueprint = {}
+                        if Configs.MailPetsFilter then for _, v in ipairs(Configs.MailPetsFilter) do table.insert(scanningBlueprint, {ItemKey = v, Category = "Pets"}) end end
+                        if Configs.MailFruitsFilter then for _, v in ipairs(Configs.MailFruitsFilter) do table.insert(scanningBlueprint, {ItemKey = v, Category = "HarvestedFruits"}) end end
+                        if Configs.MailSeedsFilter then for _, v in ipairs(Configs.MailSeedsFilter) do table.insert(scanningBlueprint, {ItemKey = v, Category = "Seeds"}) end end
+                        if Configs.MailSprinklersFilter then for _, v in ipairs(Configs.MailSprinklersFilter) do table.insert(scanningBlueprint, {ItemKey = v, Category = "Sprinklers"}) end end
+                        if Configs.MailWateringCansFilter then for _, v in ipairs(Configs.MailWateringCansFilter) do table.insert(scanningBlueprint, {ItemKey = v, Category = "WateringCans"}) end end
+                        if Configs.MailCratesFilter then for _, v in ipairs(Configs.MailCratesFilter) do table.insert(scanningBlueprint, {ItemKey = v, Category = "Crates"}) end end
+                        if Configs.MailSeedPacksFilter then for _, v in ipairs(Configs.MailSeedPacksFilter) do table.insert(scanningBlueprint, {ItemKey = v, Category = "SeedPacks"}) end end
+                        if Configs.MailEggsFilter then for _, v in ipairs(Configs.MailEggsFilter) do table.insert(scanningBlueprint, {ItemKey = v, Category = "Eggs"}) end end
+                        if Configs.MailToolsFilter then 
+                            for _, v in ipairs(Configs.MailToolsFilter) do 
+                                local assignedCategory = "Tools"
+                                if v == "Trowel" then assignedCategory = "Trowels"
+                                elseif v == "Basic Pot" then assignedCategory = "EmptyPots" end
+                                table.insert(scanningBlueprint, {ItemKey = v, Category = assignedCategory}) 
+                            end 
+                        end
+                        for _, giftConfig in pairs(scanningBlueprint) do
+                            if Configs.SendMailEnabled ~= true then break end
+                            local itemName = giftConfig.ItemKey
+                            local serverCategory = giftConfig.Category
+                            
+                            if serverCategory == "Pets" or serverCategory == "HarvestedFruits" then
+                                maxQuantity = math.min(maxQuantity, 20)
+                                
+                                local targetFolder = LocalPlayer:FindFirstChild("Backpack") 
+                                    or LocalPlayer:FindFirstChild(serverCategory)
+                                    or LocalPlayer:FindFirstChild("Pets")
+                                
+                                if targetFolder then
+                                    local children = targetFolder:GetChildren()
+                                    local cleanNamePattern = itemName:gsub("([^%w])", "%%%1")
+                                    
+                                    for cIdx = 1, #children do
+                                        if currentBatchCount >= maxQuantity then break end
+                                        local instanceObj = children[cIdx]
+                                        
+                                        if string.find(instanceObj.Name, "^" .. cleanNamePattern) then
+                                            local isFavorited = instanceObj:GetAttribute("isFavorite") or instanceObj:GetAttribute("IsFavorite") or instanceObj:GetAttribute("favorite") or instanceObj:GetAttribute("Locked")
+                                            if isFavorited ~= true then
+                                                local extractedUniqueKey = nil
+                                                if serverCategory == "Pets" then
+                                                    extractedUniqueKey = instanceObj:GetAttribute("PetId")
+                                                else
+                                                    extractedUniqueKey = instanceObj:GetAttribute("Id") or instanceObj:GetAttribute("UUID")
+                                                end
+                                                
+                                                if extractedUniqueKey then
+                                                    local uniqueStrKey = tostring(extractedUniqueKey)
+                                                    local alreadyInBatch = false
+                                                    for bIdx = 1, #itemsToBatch do
+                                                        if itemsToBatch[bIdx].ItemKey == uniqueStrKey then
+                                                            alreadyInBatch = true
+                                                            break
+                                                        end
+                                                    end
+                                                    
+                                                    if not alreadyInBatch then
+                                                        targetItemToProcess = {Name = itemName, Category = serverCategory}
+                                                        table.insert(itemsToBatch, {
+                                                            ["Category"] = serverCategory,
+                                                            ["ItemKey"] = uniqueStrKey,
+                                                            ["Count"] = 1
+                                                        })
+                                                        currentBatchCount = currentBatchCount + 1
+                                                    end
+                                                end
+                                            end
+                                        end
+                                    end
+                                end
+                            else
+                                local backpack = LocalPlayer:FindFirstChild("Backpack") or LocalPlayer:FindFirstChild(serverCategory .. "Inventory") or LocalPlayer:FindFirstChild(serverCategory)
+                                if backpack then
+                                    local foundTool = backpack:FindFirstChild(itemName)
+                                    if foundTool then
+                                        local isToolFavorited = foundTool:GetAttribute("isFavorite") or foundTool:GetAttribute("IsFavorite") or foundTool:GetAttribute("favorite") or foundTool:GetAttribute("Locked")
+                                        if isToolFavorited ~= true then
+                                            local totalAvailableToPull = 0
+                                            local countAttr = foundTool:GetAttribute("Count") or foundTool:GetAttribute("Amount") or foundTool:GetAttribute("Quantity")
+                                            if countAttr then
+                                                totalAvailableToPull = tonumber(countAttr) or 1
+                                            else
+                                                totalAvailableToPull = 1
+                                            end
+                                            
+                                            local actualToSendCount = math.min(maxQuantity, totalAvailableToPull)
+                                            targetItemToProcess = {Name = itemName, Category = serverCategory}
+                                            table.insert(itemsToBatch, {
+                                                ["Category"] = serverCategory,
+                                                ["ItemKey"] = itemName,
+                                                ["Count"] = actualToSendCount
+                                            })
+                                            currentBatchCount = actualToSendCount
+                                        end
+                                    end
+                                end
+                            end
+                            if targetItemToProcess and #itemsToBatch > 0 then break end
+                        end
+                        if not targetItemToProcess or #itemsToBatch == 0 then return end
+                        
+                        local batchSuccess, responseMsg = network.Mailbox.SendBatch:Fire(uidLookup, itemsToBatch, "")
+                        if batchSuccess then
+                            if _G.PostMailboxTerminalAlert then _G.PostMailboxTerminalAlert("Dispatched Bulk Batch (" .. tostring(currentBatchCount) .. "x) successfully!", false) end
+                        else
+                            if _G.PostMailboxTerminalAlert then _G.PostMailboxTerminalAlert("Error: " .. tostring(responseMsg or "Failed"), true) end
+                        end
+                    end
+                end
+            end)
+            
+            local sleepDuration = tonumber(Configs.MailSendInterval) or 5
+            task.wait(math.max(sleepDuration, 0.5))
+        else
+            task.wait(1.0)
+        end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        local Configs = _G.DecodeAPI and _G.DecodeAPI.Configs
+        if Configs and Configs.ClaimMailEnabled == true then
+            pcall(function()
+                local sharedMod = ReplicatedStorage:FindFirstChild("SharedModules")
+                local networkingMod = sharedMod and sharedMod:FindFirstChild("Networking")
+                if networkingMod then
+                    local success, network = pcall(require, networkingMod)
+                    if success and network and network.Mailbox and network.Mailbox.OpenInbox and network.Mailbox.Claim then
+                        local inboxData = network.Mailbox.OpenInbox:Fire()
+                        if inboxData and type(inboxData) == "table" then
+                            for mailId, _ in pairs(inboxData) do
+                                if Configs.ClaimMailEnabled ~= true then break end
+                                network.Mailbox.Claim:Fire(tostring(mailId))
+                                task.wait(0.2)
+                            end
+                        end
+                    end
+                end
+            end)
+            task.wait(2.0)
+        else
             task.wait(1.0)
         end
     end
