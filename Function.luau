@@ -1637,8 +1637,7 @@ task.spawn(function()
         end
     end)
 
-    local runThread
-    runThread = task.spawn(function()
+    task.spawn(function()
         while true do
             task.wait(0.1)
 
@@ -1651,31 +1650,54 @@ task.spawn(function()
 
             local Character = localPlayer.Character
             local Backpack = localPlayer:FindFirstChild("Backpack")
-            if not Character or not Backpack then continue end
+            local HumanoidRootPart = Character and Character:FindFirstChild("HumanoidRootPart")
+            if not Character or not Backpack or not HumanoidRootPart then continue end
 
-            local ownPlotId = localPlayer:GetAttribute("PlotId")
-            local gardens = workspace:FindFirstChild("Gardens")
-            if not gardens then continue end
+            local gardensFolder = workspace:FindFirstChild("Gardens")
+            if not gardensFolder then continue end
 
             local myPlot = nil
-            if ownPlotId then
-                myPlot = gardens:FindFirstChild("Plot" .. tostring(ownPlotId))
+            for _, plot in ipairs(gardensFolder:GetChildren()) do
+                local idChild = plot:FindFirstChild("OwnerUserId")
+                local nameChild = plot:FindFirstChild("Owner")
+                local idVal = idChild and (idChild:IsA("ValueBase") and idChild.Value or idChild)
+                local nameVal = nameChild and (nameChild:IsA("ValueBase") and nameChild.Value or nameChild)
+                local idAttr = plot:GetAttribute("OwnerUserId")
+                local nameAttr = plot:GetAttribute("Owner")
+                
+                local matchId = (idVal == localPlayer.UserId) or (idAttr == localPlayer.UserId)
+                local matchName = (nameVal == localPlayer.Name) or (nameAttr == localPlayer.Name)
+                
+                if matchId or matchName or string.find(string.lower(plot.Name), string.lower(localPlayer.Name), 1, true) then
+                    myPlot = plot
+                    break
+                end
             end
+            
             if not myPlot then
-                for _, plot in ipairs(gardens:GetChildren()) do
-                    if string.find(string.lower(plot.Name), string.lower(localPlayer.Name), 1, true) then
-                        myPlot = plot
-                        break
+                local hrpPos = HumanoidRootPart.Position
+                local closestDist = math.huge
+                for _, plot in ipairs(gardensFolder:GetChildren()) do
+                    local pivotPart = plot.PrimaryPart or plot:FindFirstChild("Floor") or plot:FindFirstChildOfClass("BasePart") or plot:FindFirstChildOfClass("MeshPart")
+                    if pivotPart then
+                        local dist = (hrpPos - pivotPart.Position).Magnitude
+                        if dist < closestDist and dist < 200 then
+                            closestDist = dist
+                            myPlot = plot
+                        end
                     end
                 end
             end
             if not myPlot then continue end
+            -- [[ REWIRED TROWEL SCANNER WITH SMART PLOT FINDER - PART 2 ]]
             local plantsFolder = myPlot:FindFirstChild("Plants")
             if not plantsFolder then continue end
 
             local plotAnchor = myPlot.PrimaryPart or myPlot:FindFirstChild("Floor") or myPlot:FindFirstChildOfClass("BasePart") or myPlot:FindFirstChildOfClass("MeshPart")
             if not plotAnchor then continue end
+            
             local successPos, targetWorldPos = pcall(function()
+                -- Decodes the full structural orientation matrix out from your saved array numbers
                 local unpackedCFrame = CFrame.new(unpack(configurationsTable.TrowelSavedCFrame))
                 local basePos = plotAnchor.CFrame:ToWorldSpace(unpackedCFrame).Position
                 return Vector3.new(basePos.X, basePos.Y - 3.2, basePos.Z)
@@ -1686,6 +1708,8 @@ task.spawn(function()
             local waitDelay = (interval <= 0) and 0.1 or interval
 
             for _, plant in ipairs(plantsFolder:GetChildren()) do
+                if not configurationsTable.AutoTrowelToggleState then break end
+                
                 local isReady = plant:GetAttribute("PlantGrowthReady")
                 local plantId = plant:GetAttribute("PlantId")
                 local seedName = plant:GetAttribute("SeedName")
