@@ -1,4 +1,3 @@
---2
 local Decode = {}
 
 local CoreGui = game:GetService("CoreGui")
@@ -48,7 +47,9 @@ local Configurations = {
     PetTweenSpeed = 16,
     SelectedPetsFilter = {},
     SelectedPetSizeFilter = {},
-    AutoBuyPets = false
+    AutoBuyPets = false,
+    CollectTweenSpeed = 0,
+    AutoCollectEventSeeds = false
 }
 
 local UI = {
@@ -684,8 +685,12 @@ function Decode:AddSelector(parentPage, text, options, onSelect)
         Temp.SelectBtn.TextWrapped = true
         if type(val) == "table" then
             if #val > 0 then
+                local sortedTable = {}
+                for _, item in ipairs(val) do table.insert(sortedTable, item) end
+                table.sort(sortedTable)
+
                 local textStr = ""
-                for i, option in ipairs(val) do
+                for i, option in ipairs(sortedTable) do
                     textStr = textStr .. (i == 1 and "" or ", ") .. option
                 end
                 Temp.SelectBtn.Text = textStr
@@ -1164,6 +1169,22 @@ UI.BuyPetsToggle = Decode:AddToggle(UI.PetsDrop, "Buy Pets", function(state)
     saveConfig()
 end)
 
+UI.CollectDrop = Decode:CreateDropdown(UI.CreatedPages["Main"], "Collect")
+
+Decode:AddLabel(UI.CollectDrop, "- [ Configs ] -")
+
+UI.CollectTweenSlider = Decode:AddSlider(UI.CollectDrop, "Tween Speed", Configurations.CollectTweenSpeed or 0, function(value)
+    Configurations.CollectTweenSpeed = value
+    saveConfig()
+end)
+
+Decode:AddLabel(UI.CollectDrop, "- [ Functions ] -")
+
+UI.CollectSeedsToggle = Decode:AddToggle(UI.CollectDrop, "Collect All Event Seeds", function(state)
+    Configurations.AutoCollectEventSeeds = state
+    saveConfig()
+end)
+
 task.spawn(function()
     task.wait(0.1)
 
@@ -1275,6 +1296,13 @@ task.spawn(function()
         UI.BuyPetsToggle.SwitchBg.BackgroundColor3 = Decode.Theme.AccentColor
         UI.BuyPetsToggle.SliderNode.Position = UDim2.new(1, -14, 0.5, -6)
         UI.BuyPetsToggle.SliderNode.BackgroundColor3 = Decode.Theme.TextMain
+    end
+
+    if Configurations.AutoCollectEventSeeds and UI.CollectSeedsToggle then
+        UI.CollectSeedsToggle.IsToggled = true
+        UI.CollectSeedsToggle.SwitchBg.BackgroundColor3 = Decode.Theme.AccentColor
+        UI.CollectSeedsToggle.SliderNode.Position = UDim2.new(1, -14, 0.5, -6)
+        UI.CollectSeedsToggle.SliderNode.BackgroundColor3 = Decode.Theme.TextMain
     end
 end)
 
