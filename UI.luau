@@ -1,4 +1,4 @@
--- U
+-- Test1
 local Decode = {}
 
 local CoreGui = game:GetService("CoreGui")
@@ -1639,16 +1639,55 @@ TrowelCorner.CornerRadius = UDim.new(0, 6)
 TrowelCorner.Parent = UI.SaveTrowelPosBtn
 
 UI.SaveTrowelPosBtn.MouseButton1Click:Connect(function()
-    pcall(function()
-        local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if root then
-            Configurations.TrowelSavedCFrame = {root.CFrame:GetComponents()}
-            saveConfig()
-            if _G.PostMailboxTerminalAlert then
-                _G.PostMailboxTerminalAlert("Trowel", "Saved tool coordinates successfully!", false)
+    local player = game:GetService("Players").LocalPlayer
+    if not (player and player.Character and player.Character:FindFirstChild("HumanoidRootPart")) then return end
+    local playerPlot = nil
+    local gardensFolder = game:GetService("Workspace"):FindFirstChild("Gardens")
+    if gardensFolder then
+        for _, plot in ipairs(gardensFolder:GetChildren()) do
+            local idChild = plot:FindFirstChild("OwnerUserId")
+            local nameChild = plot:FindFirstChild("Owner")
+            local idVal = idChild and (idChild:IsA("ValueBase") and idChild.Value or idChild)
+            local nameVal = nameChild and (nameChild:IsA("ValueBase") and nameChild.Value or nameChild)
+            local idAttr = plot:GetAttribute("OwnerUserId")
+            local nameAttr = plot:GetAttribute("Owner")
+            local matchId = (idVal == player.UserId) or (idAttr == player.UserId)
+            local matchName = (nameVal == player.Name) or (nameAttr == player.Name)
+            if matchId or matchName or string.find(string.lower(plot.Name), string.lower(player.Name)) then
+                playerPlot = plot
+                break
             end
         end
-    end)
+        if not playerPlot then
+            local hrpPos = player.Character.HumanoidRootPart.Position
+            local closestDist = math.huge
+            for _, plot in ipairs(gardensFolder:GetChildren()) do
+                local pivotPart = plot.PrimaryPart or plot:FindFirstChild("Floor") or plot:FindFirstChildOfClass("BasePart") or plot:FindFirstChildOfClass("MeshPart")
+                if pivotPart then
+                    local dist = (hrpPos - pivotPart.Position).Magnitude
+                    if dist < closestDist and dist < 200 then
+                        closestDist = dist
+                        playerPlot = plot
+                    end
+                end
+            end
+        end
+    end
+    if playerPlot then
+        local plotAnchor = playerPlot.PrimaryPart or playerPlot:FindFirstChild("Floor") or playerPlot:FindFirstChildOfClass("BasePart") or playerPlot:FindFirstChildOfClass("MeshPart")
+        if plotAnchor then
+            local characterCFrame = player.Character.HumanoidRootPart.CFrame
+            local relativeOffset = plotAnchor.CFrame:ToObjectSpace(characterCFrame)
+            
+            Configurations.SavedTrowelPositions = {relativeOffset:GetComponents()}
+            if saveConfig then pcall(saveConfig) end
+            
+            UI.SaveTrowelPosBtn.Text = "SAVED!"
+            task.delay(1, function()
+                UI.SaveTrowelPosBtn.Text = "Save Position"
+            end)
+        end
+    end
 end)
 
 UI.TrowelActionToggle = Decode:AddToggle(UI.TrowelDrop, "Trowel", function(state)
