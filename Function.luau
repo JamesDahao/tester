@@ -856,14 +856,12 @@ task.spawn(function()
                         
                         if not targetItemToProcess or #itemsToBatch == 0 then return end
                         
-                        local batchSuccess, responseMsg = network.Mailbox.SendBatch:Fire(uidLookup, itemsToBatch, "")
+                        local batchSuccess = network.Mailbox.SendBatch:Fire(uidLookup, itemsToBatch, "")
                         if batchSuccess then
                             processingSuccess = true
                             if _G.PostMailboxTerminalAlert then
                                 _G.PostMailboxTerminalAlert("Mailbox", "Sent " .. tostring(currentBatchCount) .. "x " .. tostring(targetItemToProcess and targetItemToProcess.Name or "Items") .. " successfully!", false) 
                             end
-                        else
-                            if _G.PostMailboxTerminalAlert then _G.PostMailboxTerminalAlert("Mailbox", tostring(responseMsg or "Failed"), true) end
                         end
                     end
                 end
@@ -905,6 +903,177 @@ task.spawn(function()
         else
             task.wait(1.0)
         end
+    end
+end)
+
+task.spawn(function()
+    local ActiveLotsTrackingProfile = {}
+    local PurchaseSuccessCounts = {}
+    local LastKnownLotIdentities = {}
+    
+    _G.LiveAuctionLotsCache = _G.LiveAuctionLotsCache or {}
+    _G.LiveAuctionStockCache = _G.LiveAuctionStockCache or {}
+
+    pcall(function()
+        local sharedMod = game:GetService("ReplicatedStorage"):FindFirstChild("SharedModules")
+        local networkingMod = sharedMod and sharedMod:FindFirstChild("Networking")
+        if networkingMod then
+            local successNet, network = pcall(require, networkingMod)
+            if successNet and network and network.Auctioneer then
+                network.Auctioneer.Snapshot.OnClientEvent:Connect(function(dataPayload)
+                    if type(dataPayload) == "table" and dataPayload.manifest and type(dataPayload.manifest.lots) == "table" then
+                        _G.LiveAuctionLotsCache = dataPayload.manifest.lots
+                        if type(dataPayload.stock) == "table" then
+                            _G.LiveAuctionStockCache = dataPayload.stock
+                        end
+                    end
+                end)
+                network.Auctioneer.StockUpdate.OnClientEvent:Connect(function(updatePayload)
+                    if type(updatePayload) == "table" and type(updatePayload.stock) == "table" then
+                        _G.LiveAuctionStockCache = updatePayload.stock
+                    elseif type(updatePayload) == "table" and updatePayload.Id then
+                        local targetId = updatePayload.Id
+                        _G.LiveAuctionStockCache[targetId] = updatePayload.Stock or updatePayload.Amount or updatePayload.Quantity or _G.LiveAuctionStockCache[targetId]
+                    end
+                end)
+                network.Auctioneer.PurchaseResult.OnClientEvent:Connect(function(lotId, purchaseSuccess, errorReason)
+                    if purchaseSuccess == true then
+                        PurchaseSuccessCounts[lotId] = (PurchaseSuccessCounts[lotId] or 0) + 1
+                    else
+                        ActiveLotsTrackingProfile[lotId] = nil
+                    end
+                end)
+            end
+        end
+    end)
+
+    while true do
+        local Configs = _G.DecodeAPI and _G.DecodeAPI.Configs
+        if Configs and Configs.AutoBuyAuctionItems == true then
+            pcall(function()
+                if _G.ResetAuctionSniperTrackingHistory == true then
+                    _G.ResetAuctionSniperTrackingHistory = nil
+                    PurchaseSuccessCounts = {}
+                    ActiveLotsTrackingProfile = {}
+                    LastKnownLotIdentities = {}
+                end
+
+                local sharedMod = game:GetService("ReplicatedStorage"):FindFirstChild("SharedModules")
+                local networkingMod = sharedMod and sharedMod:FindFirstChild("Networking")
+                local network = networkingMod and require(networkingMod)
+                if network and network.Auctioneer and network.Auctioneer.RequestSnapshot then
+                    pcall(function() network.Auctioneer.RequestSnapshot:Fire() end)
+                end
+                
+                local activeLotsTable = _G.LiveAuctionLotsCache or {}
+                local currentLiveStockTable = _G.LiveAuctionStockCache or {}
+                local targetLots = activeLotsTable.lots or (activeLotsTable.manifest and activeLotsTable.manifest.lots) or activeLotsTable
+                
+                local getSyncTimeSuccess, currentServerTime = pcall(function() return workspace:GetServerTimeNow() end)
+                if not getSyncTimeSuccess or not currentServerTime then currentServerTime = os.time() end
+                
+                local combinedFilters = {}
+                if Configs.AuctionEggsFilter then for _, v in ipairs(Configs.AuctionEggsFilter) do combinedFilters[v] = true end end
+                if Configs.AuctionSprinklersFilter then for _, v in ipairs(Configs.AuctionSprinklersFilter) do combinedFilters[v] = true end end
+                if Configs.AuctionWateringCansFilter then for _, v in ipairs(Configs.AuctionWateringCansFilter) do combinedFilters[v] = true end end
+                if Configs.AuctionSeedPacksFilter then for _, v in ipairs(Configs.AuctionSeedPacksFilter) do combinedFilters[v] = true end end
+                if Configs.AuctionSeedsFilter then for _, v in ipairs(Configs.AuctionSeedsFilter) do combinedFilters[v] = true end end
+                if Configs.AuctionCratesFilter then for _, v in ipairs(Configs.AuctionCratesFilter) do combinedFilters[v] = true end end
+
+                for lotIndex, lotData in pairs(targetLots) do
+                    if type(lotData) == "table" and lotData.lotId then
+                        local lotId = lotData.lotId
+                        local itemName = tostring(lotData.item or "")
+                        
+                        if LastKnownLotIdentities[lotIndex] ~= lotId then
+                            LastKnownLotIdentities[lotIndex] = lotId
+                            PurchaseSuccessCounts[lotId] = 0 
+                            ActiveLotsTrackingProfile[lotId] = nil 
+                        end
+
+                        local isItemWhitelisted = false
+                        for savedKey, _ in pairs(combinedFilters) do
+                            local cleanSavedKey = tostring(savedKey)
+                            if cleanSavedKey == itemName or cleanSavedKey:find(itemName, 1, true) or itemName:find(cleanSavedKey, 1, true) or cleanSavedKey:gsub("^%w+_", "") == itemName then
+                                isItemWhitelisted = true
+                                break
+                            end
+                        end
+                        if isItemWhitelisted then
+                            local currentStockLeft = tonumber(currentLiveStockTable[lotId] or lotData.stockQuantity or lotData.Stock or 0)
+                            local remainingSeconds = math.max(0, (tonumber(lotData.expiresAt) or currentServerTime) - currentServerTime)
+                            
+                            local currentLivePrice = 0
+                            if lotData.decrementIntervalSeconds and lotData.decrementIntervalSeconds > 0 then
+                                local elapsed = currentServerTime - lotData.rolledAt
+                                local ticks = math.floor((elapsed < 0 and 0 or elapsed) / lotData.decrementIntervalSeconds)
+                                currentLivePrice = lotData.startPrice - math.round(lotData.startPrice * lotData.decrementPercent / 100) * ticks
+                                if currentLivePrice < lotData.minPrice then 
+                                    currentLivePrice = lotData.minPrice 
+                                end
+                            else
+                                currentLivePrice = lotData.startPrice or 0
+                            end
+                            
+                            if currentStockLeft <= 0 or remainingSeconds <= 0 or currentLivePrice <= 0 then
+                                ActiveLotsTrackingProfile[lotId] = nil 
+                                continue 
+                            end
+                                
+                            local targetQuantityToProcure = math.max(1, math.floor(tonumber(Configs.AuctionBuyQuantity) or 1))
+                            local currentSuccessfullyBought = PurchaseSuccessCounts[lotId] or 0
+                            
+                            if currentSuccessfullyBought < targetQuantityToProcure then
+                                local shouldBuyLot = false
+                                local setSheckles = tonumber(Configs.AuctionBelowSheckles) or 0
+                                local setTimer = tonumber(Configs.AuctionBelowTimer) or 0
+                                
+                                if setSheckles > 0 and setTimer == 0 then
+                                    if currentLivePrice <= setSheckles then
+                                        shouldBuyLot = true
+                                    end
+                                elseif setTimer > 0 and setSheckles == 0 then
+                                    if remainingSeconds <= setTimer then
+                                        shouldBuyLot = true
+                                    end
+                                elseif setSheckles > 0 and setTimer > 0 then
+                                    if currentLivePrice <= setSheckles and remainingSeconds <= setTimer then
+                                        shouldBuyLot = true
+                                    end
+                                end
+
+                                if shouldBuyLot and not ActiveLotsTrackingProfile[lotId] then
+                                    local remainingQuantityNeeded = targetQuantityToProcure - currentSuccessfullyBought
+                                    local batchFireLimit = math.min(remainingQuantityNeeded, currentStockLeft)
+                                    
+                                    if batchFireLimit > 0 then
+                                        ActiveLotsTrackingProfile[lotId] = true
+                                        if network and network.Auctioneer and network.Auctioneer.PurchaseLot then
+                                            for batchIndex = 1, batchFireLimit do
+                                                task.spawn(function()
+                                                    pcall(function()
+                                                        network.Auctioneer.PurchaseLot:Fire(lotId, currentLivePrice)
+                                                    end)
+                                                end)
+                                            end
+                                        end
+                                        
+                                        local alertFunc = _G.PostAuctionTerminalAlert or _G.PostMailboxTerminalAlert
+                                        if alertFunc then
+                                            alertFunc("Auction", string.format("Fired x%d for %s!", batchFireLimit, lotData.item or "Item"), false)
+                                        end
+                                        
+                                        task.wait(0.2)
+                                        ActiveLotsTrackingProfile[lotId] = nil
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+        task.wait(0.05)
     end
 end)
 
