@@ -1,3 +1,4 @@
+--test
 local Decode = {}
 
 local CoreGui = game:GetService("CoreGui")
@@ -73,7 +74,16 @@ local Configurations = {
     AuctionWateringCansFilter = {},
     AuctionSeedPacksFilter = {},
     AuctionSeedsFilter = {},
-    AuctionCratesFilter = {}
+    AuctionCratesFilter = {},
+    ShopSeedsFilter = {},
+    BuySeeds = false,
+    BuyAllSeeds = false,
+    ShopGearsFilter = {},
+    BuyGears = false,
+    BuyAllGears = false,
+    ShopPropsFilter = {},
+    BuyProps = false,
+    BuyAllProps = false
 }
 
 local UI = {
@@ -227,6 +237,22 @@ function Decode:GetPetTypesAndSizes()
 
     table.sort(combinedList)
     return combinedList
+end
+
+function Decode:GetShopStockCategory(shopKey)
+    local items = {}
+    local repStorage = game:GetService("ReplicatedStorage")
+    local stockValues = repStorage:FindFirstChild("StockValues")
+    local shopFolder = stockValues and stockValues:FindFirstChild(shopKey)
+    local itemsFolder = shopFolder and shopFolder:FindFirstChild("Items")
+    
+    if itemsFolder then
+        for _, child in pairs(itemsFolder:GetChildren()) do
+            table.insert(items, child.Name)
+        end
+    end
+    table.sort(items)
+    return items
 end
 
 UI.ScreenGui = Instance.new("ScreenGui")
@@ -1549,6 +1575,138 @@ UI.BuyAuctionToggle = Decode:AddToggle(UI.AuctionDrop, "Buy Items", function(sta
     saveConfig()
 end)
 
+UI.ShopSeedsDrop = Decode:CreateDropdown(UI.CreatedPages["Shop"], "Seeds")
+Decode:AddLabel(UI.ShopSeedsDrop, "- [ Options ] -")
+
+UI.ShopSeedsSelector = Decode:AddSelector(UI.ShopSeedsDrop, "Select Seeds", {}, function(chosen, selectorObj)
+    Configurations.ShopSeedsFilter = Configurations.ShopSeedsFilter or {}
+    local idx = table.find(Configurations.ShopSeedsFilter, chosen)
+    if idx then table.remove(Configurations.ShopSeedsFilter, idx) else table.insert(Configurations.ShopSeedsFilter, chosen) end
+    saveConfig()
+    selectorObj:UpdateSelectionText(Configurations.ShopSeedsFilter)
+end)
+
+Decode:AddLabel(UI.ShopSeedsDrop, "- [ Functions ] -")
+
+UI.BuySeedsToggle = {}
+UI.BuyAllSeedsToggle = {}
+
+UI.BuySeedsToggle = Decode:AddToggle(UI.ShopSeedsDrop, "Buy Seeds", function(state)
+    Configurations.BuySeeds = state
+    saveConfig()
+    if state and Configurations.BuyAllSeeds then
+        Configurations.BuyAllSeeds = false
+        saveConfig()
+        if UI.BuyAllSeedsToggle and UI.BuyAllSeedsToggle.SwitchBg then
+            UI.BuyAllSeedsToggle.IsToggled = false
+            TweenService:Create(UI.BuyAllSeedsToggle.SwitchBg, TweenInfo.new(0.15), {BackgroundColor3 = Decode.Theme.MainBackground}):Play()
+            TweenService:Create(UI.BuyAllSeedsToggle.SliderNode, TweenInfo.new(0.15), {Position = UDim2.new(0, 2, 0.5, -6), BackgroundColor3 = Decode.Theme.TextMuted}):Play()
+        end
+    end
+end)
+
+UI.BuyAllSeedsToggle = Decode:AddToggle(UI.ShopSeedsDrop, "Buy All Seeds", function(state)
+    Configurations.BuyAllSeeds = state
+    saveConfig()
+    if state and Configurations.BuySeeds then
+        Configurations.BuySeeds = false
+        saveConfig()
+        if UI.BuySeedsToggle and UI.BuySeedsToggle.SwitchBg then
+            UI.BuySeedsToggle.IsToggled = false
+            TweenService:Create(UI.BuySeedsToggle.SwitchBg, TweenInfo.new(0.15), {BackgroundColor3 = Decode.Theme.MainBackground}):Play()
+            TweenService:Create(UI.BuySeedsToggle.SliderNode, TweenInfo.new(0.15), {Position = UDim2.new(0, 2, 0.5, -6), BackgroundColor3 = Decode.Theme.TextMuted}):Play()
+        end
+    end
+end)
+
+UI.ShopGearsDrop = Decode:CreateDropdown(UI.CreatedPages["Shop"], "Gears")
+Decode:AddLabel(UI.ShopGearsDrop, "- [ Options ] -")
+
+UI.ShopGearsSelector = Decode:AddSelector(UI.ShopGearsDrop, "Select Gears", {}, function(chosen, selectorObj)
+    Configurations.ShopGearsFilter = Configurations.ShopGearsFilter or {}
+    local idx = table.find(Configurations.ShopGearsFilter, chosen)
+    if idx then table.remove(Configurations.ShopGearsFilter, idx) else table.insert(Configurations.ShopGearsFilter, chosen) end
+    saveConfig()
+    selectorObj:UpdateSelectionText(Configurations.ShopGearsFilter)
+end)
+
+Decode:AddLabel(UI.ShopGearsDrop, "- [ Functions ] -")
+
+UI.BuyGearsToggle = {}
+UI.BuyAllGearsToggle = {}
+
+UI.BuyGearsToggle = Decode:AddToggle(UI.ShopGearsDrop, "Buy Gears", function(state)
+    Configurations.BuyGears = state
+    saveConfig()
+    if state and Configurations.BuyAllGears then
+        Configurations.BuyAllGears = false
+        saveConfig()
+        if UI.BuyAllGearsToggle and UI.BuyAllGearsToggle.SwitchBg then
+            UI.BuyAllGearsToggle.IsToggled = false
+            TweenService:Create(UI.BuyAllGearsToggle.SwitchBg, TweenInfo.new(0.15), {BackgroundColor3 = Decode.Theme.MainBackground}):Play()
+            TweenService:Create(UI.BuyAllGearsToggle.SliderNode, TweenInfo.new(0.15), {Position = UDim2.new(0, 2, 0.5, -6), BackgroundColor3 = Decode.Theme.TextMuted}):Play()
+        end
+    end
+end)
+
+UI.BuyAllGearsToggle = Decode:AddToggle(UI.ShopGearsDrop, "Buy All Gears", function(state)
+    Configurations.BuyAllGears = state
+    saveConfig()
+    if state and Configurations.BuyGears then
+        Configurations.BuyGears = false
+        saveConfig()
+        if UI.BuyGearsToggle and UI.BuyGearsToggle.SwitchBg then
+            UI.BuyGearsToggle.IsToggled = false
+            TweenService:Create(UI.BuyGearsToggle.SwitchBg, TweenInfo.new(0.15), {BackgroundColor3 = Decode.Theme.MainBackground}):Play()
+            TweenService:Create(UI.BuyGearsToggle.SliderNode, TweenInfo.new(0.15), {Position = UDim2.new(0, 2, 0.5, -6), BackgroundColor3 = Decode.Theme.TextMuted}):Play()
+        end
+    end
+end)
+
+UI.ShopPropsDrop = Decode:CreateDropdown(UI.CreatedPages["Shop"], "Props")
+Decode:AddLabel(UI.ShopPropsDrop, "- [ Options ] -")
+
+UI.ShopPropsSelector = Decode:AddSelector(UI.ShopPropsDrop, "Select Props", {}, function(chosen, selectorObj)
+    Configurations.ShopPropsFilter = Configurations.ShopPropsFilter or {}
+    local idx = table.find(Configurations.ShopPropsFilter, chosen)
+    if idx then table.remove(Configurations.ShopPropsFilter, idx) else table.insert(Configurations.ShopPropsFilter, chosen) end
+    saveConfig()
+    selectorObj:UpdateSelectionText(Configurations.ShopPropsFilter)
+end)
+
+Decode:AddLabel(UI.ShopPropsDrop, "- [ Functions ] -")
+
+UI.BuyPropsToggle = {}
+UI.BuyAllPropsToggle = {}
+
+UI.BuyPropsToggle = Decode:AddToggle(UI.ShopPropsDrop, "Buy Props", function(state)
+    Configurations.BuyProps = state
+    saveConfig()
+    if state and Configurations.BuyAllProps then
+        Configurations.BuyAllProps = false
+        saveConfig()
+        if UI.BuyAllPropsToggle and UI.BuyAllPropsToggle.SwitchBg then
+            UI.BuyAllPropsToggle.IsToggled = false
+            TweenService:Create(UI.BuyAllPropsToggle.SwitchBg, TweenInfo.new(0.15), {BackgroundColor3 = Decode.Theme.MainBackground}):Play()
+            TweenService:Create(UI.BuyAllPropsToggle.SliderNode, TweenInfo.new(0.15), {Position = UDim2.new(0, 2, 0.5, -6), BackgroundColor3 = Decode.Theme.TextMuted}):Play()
+        end
+    end
+end)
+
+UI.BuyAllPropsToggle = Decode:AddToggle(UI.ShopPropsDrop, "Buy All Props", function(state)
+    Configurations.BuyAllProps = state
+    saveConfig()
+    if state and Configurations.BuyProps then
+        Configurations.BuyProps = false
+        saveConfig()
+        if UI.BuyPropsToggle and UI.BuyPropsToggle.SwitchBg then
+            UI.BuyPropsToggle.IsToggled = false
+            TweenService:Create(UI.BuyPropsToggle.SwitchBg, TweenInfo.new(0.15), {BackgroundColor3 = Decode.Theme.MainBackground}):Play()
+            TweenService:Create(UI.BuyPropsToggle.SliderNode, TweenInfo.new(0.15), {Position = UDim2.new(0, 2, 0.5, -6), BackgroundColor3 = Decode.Theme.TextMuted}):Play()
+        end
+    end
+end)
+
 task.spawn(function()
     task.wait(0.1)
 
@@ -1706,6 +1864,49 @@ task.spawn(function()
         UI.BuyAuctionToggle.SliderNode.Position = UDim2.new(1, -14, 0.5, -6)
         UI.BuyAuctionToggle.SliderNode.BackgroundColor3 = Decode.Theme.TextMain
     end
+
+    if Configurations.ShopSeedsFilter then UI.ShopSeedsSelector:UpdateSelectionText(Configurations.ShopSeedsFilter) end
+    if Configurations.ShopGearsFilter then UI.ShopGearsSelector:UpdateSelectionText(Configurations.ShopGearsFilter) end
+    if Configurations.ShopPropsFilter then UI.ShopPropsSelector:UpdateSelectionText(Configurations.ShopPropsFilter) end
+
+    if Configurations.BuySeeds and UI.BuySeedsToggle then
+        UI.BuySeedsToggle.IsToggled = true
+        UI.BuySeedsToggle.SwitchBg.BackgroundColor3 = Decode.Theme.AccentColor
+        UI.BuySeedsToggle.SliderNode.Position = UDim2.new(1, -14, 0.5, -6)
+        UI.BuySeedsToggle.SliderNode.BackgroundColor3 = Decode.Theme.TextMain
+    end
+    if Configurations.BuyAllSeeds and UI.BuyAllSeedsToggle then
+        UI.BuyAllSeedsToggle.IsToggled = true
+        UI.BuyAllSeedsToggle.SwitchBg.BackgroundColor3 = Decode.Theme.AccentColor
+        UI.BuyAllSeedsToggle.SliderNode.Position = UDim2.new(1, -14, 0.5, -6)
+        UI.BuyAllSeedsToggle.SliderNode.BackgroundColor3 = Decode.Theme.TextMain
+    end
+
+    if Configurations.BuyGears and UI.BuyGearsToggle then
+        UI.BuyGearsToggle.IsToggled = true
+        UI.BuyGearsToggle.SwitchBg.BackgroundColor3 = Decode.Theme.AccentColor
+        UI.BuyGearsToggle.SliderNode.Position = UDim2.new(1, -14, 0.5, -6)
+        UI.BuyGearsToggle.SliderNode.BackgroundColor3 = Decode.Theme.TextMain
+    end
+    if Configurations.BuyAllGears and UI.BuyAllGearsToggle then
+        UI.BuyAllGearsToggle.IsToggled = true
+        UI.BuyAllGearsToggle.SwitchBg.BackgroundColor3 = Decode.Theme.AccentColor
+        UI.BuyAllGearsToggle.SliderNode.Position = UDim2.new(1, -14, 0.5, -6)
+        UI.BuyAllGearsToggle.SliderNode.BackgroundColor3 = Decode.Theme.TextMain
+    end
+
+    if Configurations.BuyProps and UI.BuyPropsToggle then
+        UI.BuyPropsToggle.IsToggled = true
+        UI.BuyPropsToggle.SwitchBg.BackgroundColor3 = Decode.Theme.AccentColor
+        UI.BuyPropsToggle.SliderNode.Position = UDim2.new(1, -14, 0.5, -6)
+        UI.BuyPropsToggle.SliderNode.BackgroundColor3 = Decode.Theme.TextMain
+    end
+    if Configurations.BuyAllProps and UI.BuyAllPropsToggle then
+        UI.BuyAllPropsToggle.IsToggled = true
+        UI.BuyAllPropsToggle.SwitchBg.BackgroundColor3 = Decode.Theme.AccentColor
+        UI.BuyAllPropsToggle.SliderNode.Position = UDim2.new(1, -14, 0.5, -6)
+        UI.BuyAllPropsToggle.SliderNode.BackgroundColor3 = Decode.Theme.TextMain
+    end
 end)
 
 task.spawn(function()
@@ -1744,6 +1945,14 @@ task.spawn(function()
     if UI.AuctionSeedPacksSelector and UI.AuctionSeedPacksSelector.Populate then pcall(function() UI.AuctionSeedPacksSelector:Populate(PacksList) end) end
     if UI.AuctionSeedsSelector and UI.AuctionSeedsSelector.Populate then pcall(function() UI.AuctionSeedsSelector:Populate(SeedsList) end) end
     if UI.AuctionCratesSelector and UI.AuctionCratesSelector.Populate then pcall(function() UI.AuctionCratesSelector:Populate(CratesList) end) end
+
+    local liveShopSeeds = Decode:GetShopStockCategory("SeedShop")
+    local liveShopGears = Decode:GetShopStockCategory("GearShop")
+    local liveShopProps = Decode:GetShopStockCategory("CrateShop")
+    
+    if UI.ShopSeedsSelector and UI.ShopSeedsSelector.Populate then pcall(function() UI.ShopSeedsSelector:Populate(liveShopSeeds) end) end
+    if UI.ShopGearsSelector and UI.ShopGearsSelector.Populate then pcall(function() UI.ShopGearsSelector:Populate(liveShopGears) end) end
+    if UI.ShopPropsSelector and UI.ShopPropsSelector.Populate then pcall(function() UI.ShopPropsSelector:Populate(liveShopProps) end) end
 end)
 
 UI.CloseTweenInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
@@ -1791,7 +2000,7 @@ UI.ConfirmDesc = Instance.new("TextLabel")
 UI.ConfirmDesc.Size = UDim2.new(1, -40, 0, 35)
 UI.ConfirmDesc.Position = UDim2.new(0, 20, 0, 85)
 UI.ConfirmDesc.BackgroundTransparency = 1
-UI.ConfirmDesc.Text = "Are you sure you want to close the UI?"
+UI.ConfirmDesc.Text = "Are you sure you want to close the UI?\nYou won't be able to re-open in this session."
 UI.ConfirmDesc.TextColor3 = Decode.Theme.TextMuted
 UI.ConfirmDesc.TextSize = 13
 UI.ConfirmDesc.Font = Enum.Font.SourceSans
