@@ -1,3 +1,4 @@
+--test
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
@@ -1074,6 +1075,210 @@ task.spawn(function()
             end)
         end
         task.wait(0.05)
+    end
+end)
+
+task.spawn(function()
+    while true do
+        local Configs = _G.DecodeAPI and _G.DecodeAPI.Configs
+        if Configs and (Configs.BuyGears or Configs.BuyAllGears) then
+            pcall(function()
+                local stockValuesFolder = ReplicatedStorage:FindFirstChild("StockValues")
+                local gearShopStock = stockValuesFolder and stockValuesFolder:FindFirstChild("GearShop") and stockValuesFolder.GearShop:FindFirstChild("Items")
+                local sharedMod = ReplicatedStorage:FindFirstChild("SharedModules")
+                local networkingMod = sharedMod and sharedMod:FindFirstChild("Networking")
+                
+                if networkingMod and gearShopStock then
+                    local success, network = pcall(require, networkingMod)
+                    if success and network and network.GearShop and network.GearShop.PurchaseGear then
+                        
+                        local targetGearToBuyList = {}
+                        if Configs.BuyAllGears then
+                            for _, item in ipairs(gearShopStock:GetChildren()) do table.insert(targetGearToBuyList, item.Name) end
+                        elseif Configs.ShopGearsFilter then
+                            for _, gearName in ipairs(Configs.ShopGearsFilter) do table.insert(targetGearToBuyList, tostring(gearName)) end
+                        end
+
+                        local batchCount = 0
+                        local totalStockAvailableToBuy = 0
+                        
+                        for i = 1, #targetGearToBuyList do
+                            if not Configs.BuyGears and not Configs.BuyAllGears then break end
+                            local selectedGearName = targetGearToBuyList[i]
+                            local itemStockFolder = gearShopStock:FindFirstChild(selectedGearName)
+                            local currentStockLeft = 0
+                            
+                            if itemStockFolder then
+                                local amountObj = itemStockFolder:FindFirstChild("Amount") or itemStockFolder:FindFirstChild("Stock") or itemStockFolder:FindFirstChild("Value")
+                                if amountObj then currentStockLeft = tonumber(amountObj.Value) or 0
+                                else
+                                    local fallbackVal = itemStockFolder:IsA("ValueBase") and itemStockFolder.Value
+                                    if fallbackVal then currentStockLeft = tonumber(fallbackVal) or 0
+                                    else
+                                        local attrStock = itemStockFolder:GetAttribute("Amount") or itemStockFolder:GetAttribute("Stock") or itemStockFolder:GetAttribute("Value")
+                                        if attrStock then currentStockLeft = tonumber(attrStock) or 0 end
+                                    end
+                                end
+                            end
+                            
+                            if currentStockLeft <= 0 then continue end
+                            totalStockAvailableToBuy = totalStockAvailableToBuy + 1
+                            batchCount = batchCount + 1
+                            
+                            task.spawn(function()
+                                pcall(function() network.GearShop.PurchaseGear:Fire(selectedGearName) end)
+                            end)
+                            
+                            if batchCount >= 10 then
+                                batchCount = 0
+                                task.wait(0.1)
+                            end
+                        end
+                        
+                        if totalStockAvailableToBuy == 0 then task.wait(1.5) end
+                    end
+                end
+            end)
+            task.wait(0.05)
+        else
+            task.wait(0.5)
+        end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        local Configs = _G.DecodeAPI and _G.DecodeAPI.Configs
+        if Configs and (Configs.BuySeeds or Configs.BuyAllSeeds) then
+            pcall(function()
+                local stockValuesFolder = ReplicatedStorage:FindFirstChild("StockValues")
+                local seedShopStock = stockValuesFolder and stockValuesFolder:FindFirstChild("SeedShop") and stockValuesFolder.SeedShop:FindFirstChild("Items")
+                local sharedMod = ReplicatedStorage:FindFirstChild("SharedModules")
+                local networkingMod = sharedMod and sharedMod:FindFirstChild("Networking")
+                
+                if networkingMod and seedShopStock then
+                    local success, network = pcall(require, networkingMod)
+                    if success and network and network.SeedShop and network.SeedShop.PurchaseSeed then
+                        
+                        local targetSeedsToBuyList = {}
+                        if Configs.BuyAllSeeds then
+                            for _, item in ipairs(seedShopStock:GetChildren()) do table.insert(targetSeedsToBuyList, item.Name) end
+                        elseif Configs.ShopSeedsFilter then
+                            for _, seedName in ipairs(Configs.ShopSeedsFilter) do table.insert(targetSeedsToBuyList, tostring(seedName)) end
+                        end
+
+                        local batchCount = 0
+                        local totalStockAvailableToBuy = 0
+                        
+                        for i = 1, #targetSeedsToBuyList do
+                            if not Configs.BuySeeds and not Configs.BuyAllSeeds then break end
+                            local selectedSeedName = targetSeedsToBuyList[i]
+                            local itemStockFolder = seedShopStock:FindFirstChild(selectedSeedName)
+                            local currentStockLeft = 0
+                            
+                            if itemStockFolder then
+                                local amountObj = itemStockFolder:FindFirstChild("Amount") or itemStockFolder:FindFirstChild("Stock") or itemStockFolder:FindFirstChild("Value")
+                                if amountObj then currentStockLeft = tonumber(amountObj.Value) or 0
+                                else
+                                    local fallbackVal = itemStockFolder:IsA("ValueBase") and itemStockFolder.Value
+                                    if fallbackVal then currentStockLeft = tonumber(fallbackVal) or 0
+                                    else
+                                        local attrStock = itemStockFolder:GetAttribute("Amount") or itemStockFolder:GetAttribute("Stock") or itemStockFolder:GetAttribute("Value")
+                                        if attrStock then currentStockLeft = tonumber(attrStock) or 0 end
+                                    end
+                                end
+                            end
+                            
+                            if currentStockLeft <= 0 then continue end
+                            totalStockAvailableToBuy = totalStockAvailableToBuy + 1
+                            batchCount = batchCount + 1
+                            
+                            task.spawn(function()
+                                pcall(function() network.SeedShop.PurchaseSeed:Fire(selectedSeedName) end)
+                            end)
+                            
+                            if batchCount >= 10 then
+                                batchCount = 0
+                                task.wait(0.1)
+                            end
+                        end
+                        
+                        if totalStockAvailableToBuy == 0 then task.wait(1.5) end
+                    end
+                end
+            end)
+            task.wait(0.05)
+        else
+            task.wait(0.5)
+        end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        local Configs = _G.DecodeAPI and _G.DecodeAPI.Configs
+        if Configs and (Configs.BuyProps or Configs.BuyAllProps) then
+            pcall(function()
+                local stockValuesFolder = ReplicatedStorage:FindFirstChild("StockValues")
+                local crateShopStock = stockValuesFolder and stockValuesFolder:FindFirstChild("CrateShop") and stockValuesFolder.CrateShop:FindFirstChild("Items")
+                local sharedMod = ReplicatedStorage:FindFirstChild("SharedModules")
+                local networkingMod = sharedMod and sharedMod:FindFirstChild("Networking")
+                
+                if networkingMod and crateShopStock then
+                    local success, network = pcall(require, networkingMod)
+                    if success and network and network.CrateShop and network.CrateShop.PurchaseCrate then
+                        
+                        local targetCratesToBuyList = {}
+                        if Configs.BuyAllProps then
+                            for _, item in ipairs(crateShopStock:GetChildren()) do table.insert(targetCratesToBuyList, item.Name) end
+                        elseif Configs.ShopPropsFilter then
+                            for _, crateName in ipairs(Configs.ShopPropsFilter) do table.insert(targetCratesToBuyList, tostring(crateName)) end
+                        end
+
+                        local batchCount = 0
+                        local totalStockAvailableToBuy = 0
+                        
+                        for i = 1, #targetCratesToBuyList do
+                            if not Configs.BuyProps and not Configs.BuyAllProps then break end
+                            local selectedCrateName = targetCratesToBuyList[i]
+                            local itemStockFolder = crateShopStock:FindFirstChild(selectedCrateName)
+                            local currentStockLeft = 0
+                            
+                            if itemStockFolder then
+                                local amountObj = itemStockFolder:FindFirstChild("Amount") or itemStockFolder:FindFirstChild("Stock") or itemStockFolder:FindFirstChild("Value")
+                                if amountObj then currentStockLeft = tonumber(amountObj.Value) or 0
+                                else
+                                    local fallbackVal = itemStockFolder:IsA("ValueBase") and itemStockFolder.Value
+                                    if fallbackVal then currentStockLeft = tonumber(fallbackVal) or 0
+                                    else
+                                        local attrStock = itemStockFolder:GetAttribute("Amount") or itemStockFolder:GetAttribute("Stock") or itemStockFolder:GetAttribute("Value")
+                                        if attrStock then currentStockLeft = tonumber(attrStock) or 0 end
+                                    end
+                                end
+                            end
+                            
+                            if currentStockLeft <= 0 then continue end
+                            totalStockAvailableToBuy = totalStockAvailableToBuy + 1
+                            batchCount = batchCount + 1
+                            
+                            task.spawn(function()
+                                pcall(function() network.CrateShop.PurchaseCrate:Fire(selectedCrateName) end)
+                            end)
+                            
+                            if batchCount >= 10 then
+                                batchCount = 0
+                                task.wait(0.1)
+                            end
+                        end
+                        
+                        if totalStockAvailableToBuy == 0 then task.wait(1.5) end
+                    end
+                end
+            end)
+            task.wait(0.05)
+        else
+            task.wait(0.5)
+        end
     end
 end)
 
