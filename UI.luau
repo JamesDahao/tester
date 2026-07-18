@@ -1,3 +1,4 @@
+--1
 local Decode = {}
 
 local CoreGui = game:GetService("CoreGui")
@@ -128,7 +129,7 @@ function Decode:GetAssetCategory(categoryName)
     
     if folder then
         for _, child in pairs(folder:GetChildren()) do
-            if child:IsA("Folder") or child:IsA("Model") then 
+            if child:IsA("Folder") or child:IsA("Model") or child:IsA("Tool") or child:IsA("ModuleScript") then 
                 table.insert(items, child.Name) 
             end
         end
@@ -159,35 +160,21 @@ function Decode:GetPetTypesAndSizes()
     local combinedList = {}
     local repStorage = game:GetService("ReplicatedStorage")
     local sharedData = repStorage:FindFirstChild("SharedData")
-
+    
     local typeMod = sharedData and sharedData:FindFirstChild("PetTypes")
-    if typeMod and typeMod:IsA("ModuleScript") then
-        local success, data = pcall(require, typeMod)
-        if success and type(data) == "table" then
-            local getupvalue = debug["getupvalue"]
-            if getupvalue then
-                local counter = 1
-                while true do
-                    local name, value = getupvalue(data.IsValid or function() end, counter)
-                    if not name then break end
-                    if type(value) == "table" and (value["Rainbow"] ~= nil) then
-                        for typeName, _ in pairs(value) do
-                            table.insert(combinedList, tostring(typeName))
-                        end
-                        break
-                    end
-                    counter = counter + 1
-                end
+    if typeMod then
+        for _, child in pairs(typeMod:GetChildren()) do
+            if child:IsA("ModuleScript") or child:IsA("Folder") then
+                table.insert(combinedList, child.Name)
             end
         end
     end
     
     local sizeMod = sharedData and sharedData:FindFirstChild("PetSizes")
-    if sizeMod and sizeMod:IsA("ModuleScript") then
-        local success, data = pcall(require, sizeMod)
-        if success and type(data) == "table" and data.Scales then
-            for sizeName, _ in pairs(data.Scales) do
-                table.insert(combinedList, tostring(sizeName))
+    if sizeMod then
+        for _, child in pairs(sizeMod:GetChildren()) do
+            if child:IsA("ModuleScript") or child:IsA("Folder") then
+                table.insert(combinedList, child.Name)
             end
         end
     end
