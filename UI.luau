@@ -1,3 +1,4 @@
+-- U
 local Decode = {}
 
 local CoreGui = game:GetService("CoreGui")
@@ -86,7 +87,15 @@ local Configurations = {
     PlantInterval = 0,
     PlantSeedsFilter = {},
     PlantPositionMode = "",
-    AutoPlantEnabled = false
+    AutoPlantEnabled = false,
+    PotPlantsFilter = {},
+    PotModeSelection = "",
+    PotSavedCFrame = nil,
+    AutoPotToggleState = false,
+    TrowelInterval = 0,
+    TrowelPlantsFilter = {},
+    TrowelSavedCFrame = nil,
+    AutoTrowelToggleState = false
 }
 
 local UI = {
@@ -1538,6 +1547,115 @@ UI.AutoPlantToggle = Decode:AddToggle(UI.PlantingDrop, "Plant", function(state)
     saveConfig()
 end)
 
+UI.PottedDrop = Decode:CreateDropdown(UI.CreatedPages["Assist"], "Potted")
+
+Decode:AddLabel(UI.PottedDrop, "- [ Options ] -")
+
+UI.PotPlantsSelector = Decode:AddSelector(UI.PottedDrop, "Select Plants", {}, function(chosen, selectorObj)
+    Configurations.PotPlantsFilter = Configurations.PotPlantsFilter or {}
+    local idx = table.find(Configurations.PotPlantsFilter, chosen)
+    if idx then table.remove(Configurations.PotPlantsFilter, idx) else table.insert(Configurations.PotPlantsFilter, chosen) end
+    saveConfig()
+    selectorObj:UpdateSelectionText(Configurations.PotPlantsFilter)
+end)
+
+UI.PotModeSelector = Decode:AddSelector(UI.PottedDrop, "Select Mode", {"Place", "Pickup"}, function(chosen, selectorObj)
+    if selectorObj.SelectBtn.Text == chosen then
+        Configurations.PotModeSelection = ""
+    else
+        Configurations.PotModeSelection = chosen
+    end
+    saveConfig()
+    selectorObj:UpdateSelectionText(Configurations.PotModeSelection)
+end)
+
+Decode:AddLabel(UI.PottedDrop, "- [ Functions ] -")
+
+UI.SavePotPosBtn = Instance.new("TextButton")
+UI.SavePotPosBtn.Size = UDim2.new(1, 0, 0, 36)
+UI.SavePotPosBtn.BackgroundColor3 = Decode.Theme.ElementBackground
+UI.SavePotPosBtn.BackgroundTransparency = 0.6
+UI.SavePotPosBtn.Text = "Save Position"
+UI.SavePotPosBtn.TextColor3 = Decode.Theme.TextMain
+UI.SavePotPosBtn.TextSize = 13
+UI.SavePotPosBtn.Font = Enum.Font.SourceSansBold
+UI.SavePotPosBtn.Parent = UI.PottedDrop
+
+local PotCorner = Instance.new("UICorner")
+PotCorner.CornerRadius = UDim.new(0, 6)
+PotCorner.Parent = UI.SavePotPosBtn
+
+UI.SavePotPosBtn.MouseButton1Click:Connect(function()
+    pcall(function()
+        local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if root then
+            Configurations.PotSavedCFrame = {root.CFrame:GetComponents()}
+            saveConfig()
+            if _G.PostMailboxTerminalAlert then
+                _G.PostMailboxTerminalAlert("Potted", "Saved target coordinates successfully!", false)
+            end
+        end
+    end)
+end)
+
+UI.PotActionToggle = Decode:AddToggle(UI.PottedDrop, "Pot Place/Pickup", function(state)
+    Configurations.AutoPotToggleState = state
+    saveConfig()
+end)
+
+UI.TrowelDrop = Decode:CreateDropdown(UI.CreatedPages["Assist"], "Trowel")
+
+Decode:AddLabel(UI.TrowelDrop, "- [ Configs ] -")
+
+UI.TrowelIntervalSlider = Decode:AddSlider(UI.TrowelDrop, "Trowel Interval", Configurations.TrowelInterval or 0, function(value)
+    Configurations.TrowelInterval = value
+    saveConfig()
+end)
+
+Decode:AddLabel(UI.TrowelDrop, "- [ Options ] -")
+
+UI.TrowelPlantsSelector = Decode:AddSelector(UI.TrowelDrop, "Select Plants", {}, function(chosen, selectorObj)
+    Configurations.TrowelPlantsFilter = Configurations.TrowelPlantsFilter or {}
+    local idx = table.find(Configurations.TrowelPlantsFilter, chosen)
+    if idx then table.remove(Configurations.TrowelPlantsFilter, idx) else table.insert(Configurations.TrowelPlantsFilter, chosen) end
+    saveConfig()
+    selectorObj:UpdateSelectionText(Configurations.TrowelPlantsFilter)
+end)
+
+Decode:AddLabel(UI.TrowelDrop, "- [ Functions ] -")
+
+UI.SaveTrowelPosBtn = Instance.new("TextButton")
+UI.SaveTrowelPosBtn.Size = UDim2.new(1, 0, 0, 36)
+UI.SaveTrowelPosBtn.BackgroundColor3 = Decode.Theme.ElementBackground
+UI.SaveTrowelPosBtn.BackgroundTransparency = 0.6
+UI.SaveTrowelPosBtn.Text = "Save Position"
+UI.SaveTrowelPosBtn.TextColor3 = Decode.Theme.TextMain
+UI.SaveTrowelPosBtn.TextSize = 13
+UI.SaveTrowelPosBtn.Font = Enum.Font.SourceSansBold
+UI.SaveTrowelPosBtn.Parent = UI.TrowelDrop
+
+local TrowelCorner = Instance.new("UICorner")
+TrowelCorner.CornerRadius = UDim.new(0, 6)
+TrowelCorner.Parent = UI.SaveTrowelPosBtn
+
+UI.SaveTrowelPosBtn.MouseButton1Click:Connect(function()
+    pcall(function()
+        local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if root then
+            Configurations.TrowelSavedCFrame = {root.CFrame:GetComponents()}
+            saveConfig()
+            if _G.PostMailboxTerminalAlert then
+                _G.PostMailboxTerminalAlert("Trowel", "Saved tool coordinates successfully!", false)
+            end
+        end
+    end)
+end)
+
+UI.TrowelActionToggle = Decode:AddToggle(UI.TrowelDrop, "Trowel", function(state)
+    Configurations.AutoTrowelToggleState = state
+    saveConfig()
+end)
+
 UI.AuctionDrop = Decode:CreateDropdown(UI.CreatedPages["Shop"], "Auction")
 
 Decode:AddLabel(UI.AuctionDrop, "- [ Configs ] -")
@@ -1956,6 +2074,24 @@ task.spawn(function()
         UI.AutoPlantToggle.SliderNode.Position = UDim2.new(1, -14, 0.5, -6)
         UI.AutoPlantToggle.SliderNode.BackgroundColor3 = Decode.Theme.TextMain
     end
+
+    if Configurations.PotPlantsFilter then UI.PotPlantsSelector:UpdateSelectionText(Configurations.PotPlantsFilter) end
+    if Configurations.PotModeSelection and Configurations.PotModeSelection ~= "" then UI.PotModeSelector:UpdateSelectionText(Configurations.PotModeSelection) end
+    if Configurations.TrowelPlantsFilter then UI.TrowelPlantsSelector:UpdateSelectionText(Configurations.TrowelPlantsFilter) end
+
+    if Configurations.AutoPotToggleState and UI.PotActionToggle then
+        UI.PotActionToggle.IsToggled = true
+        UI.PotActionToggle.SwitchBg.BackgroundColor3 = Decode.Theme.AccentColor
+        UI.PotActionToggle.SliderNode.Position = UDim2.new(1, -14, 0.5, -6)
+        UI.PotActionToggle.SliderNode.BackgroundColor3 = Decode.Theme.TextMain
+    end
+
+    if Configurations.AutoTrowelToggleState and UI.TrowelActionToggle then
+        UI.TrowelActionToggle.IsToggled = true
+        UI.TrowelActionToggle.SwitchBg.BackgroundColor3 = Decode.Theme.AccentColor
+        UI.TrowelActionToggle.SliderNode.Position = UDim2.new(1, -14, 0.5, -6)
+        UI.TrowelActionToggle.SliderNode.BackgroundColor3 = Decode.Theme.TextMain
+    end
 end)
 
 task.spawn(function()
@@ -1990,6 +2126,8 @@ task.spawn(function()
     
     if UI.PlantSeedsSelector and UI.PlantSeedsSelector.Populate then pcall(function() UI.PlantSeedsSelector:Populate(SeedsList) end) end
 
+    if UI.PotPlantsSelector and UI.PotPlantsSelector.Populate then pcall(function() UI.PotPlantsSelector:Populate(FruitList) end) end
+    if UI.TrowelPlantsSelector and UI.TrowelPlantsSelector.Populate then pcall(function() UI.TrowelPlantsSelector:Populate(FruitList) end) end
 
     if UI.AuctionEggsSelector and UI.AuctionEggsSelector.Populate then pcall(function() UI.AuctionEggsSelector:Populate(EggsList) end) end
     if UI.AuctionSprinklersSelector and UI.AuctionSprinklersSelector.Populate then pcall(function() UI.AuctionSprinklersSelector:Populate(SprinklersList) end) end
