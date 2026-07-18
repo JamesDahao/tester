@@ -1,4 +1,3 @@
---2
 local Decode = {}
 
 local CoreGui = game:GetService("CoreGui")
@@ -64,7 +63,17 @@ local Configurations = {
     MailEggsFilter = {},
     MailToolsFilter = {},
     SendMailEnabled = false,
-    ClaimMailEnabled = false
+    ClaimMailEnabled = false,
+    AuctionBelowTimer = 0,
+    AuctionBelowSheckles = 0,
+    AuctionBuyQuantity = 0,
+    AutoBuyAuctionItems = false,
+    AuctionEggsFilter = {},
+    AuctionSprinklersFilter = {},
+    AuctionWateringCansFilter = {},
+    AuctionSeedPacksFilter = {},
+    AuctionSeedsFilter = {},
+    AuctionCratesFilter = {}
 }
 
 local UI = {
@@ -1464,6 +1473,82 @@ UI.ClaimMailToggle = Decode:AddToggle(UI.MailboxDrop, "Claim Mail", function(sta
     saveConfig()
 end)
 
+UI.AuctionDrop = Decode:CreateDropdown(UI.CreatedPages["Shop"], "Auction")
+
+Decode:AddLabel(UI.AuctionDrop, "- [ Configs ] -")
+
+UI.AuctionTimerSlider = Decode:AddSlider(UI.AuctionDrop, "Below Timer", Configurations.AuctionBelowTimer or 0, function(value)
+    Configurations.AuctionBelowTimer = value
+    saveConfig()
+end)
+
+UI.AuctionShecklesSlider = Decode:AddSlider(UI.AuctionDrop, "Below Sheckles", Configurations.AuctionBelowSheckles or 0, function(value)
+    Configurations.AuctionBelowSheckles = value
+    saveConfig()
+end)
+
+UI.AuctionQuantitySlider = Decode:AddSlider(UI.AuctionDrop, "Buy Quantity", Configurations.AuctionBuyQuantity or 0, function(value)
+    Configurations.AuctionBuyQuantity = value
+    saveConfig()
+end)
+
+Decode:AddLabel(UI.AuctionDrop, "- [ Options ] -")
+
+UI.AuctionEggsSelector = Decode:AddSelector(UI.AuctionDrop, "Select Eggs", {}, function(chosen, selectorObj)
+    Configurations.AuctionEggsFilter = Configurations.AuctionEggsFilter or {}
+    local idx = table.find(Configurations.AuctionEggsFilter, chosen)
+    if idx then table.remove(Configurations.AuctionEggsFilter, idx) else table.insert(Configurations.AuctionEggsFilter, chosen) end
+    saveConfig()
+    selectorObj:UpdateSelectionText(Configurations.AuctionEggsFilter)
+end)
+
+UI.AuctionSprinklersSelector = Decode:AddSelector(UI.AuctionDrop, "Select Sprinklers", {}, function(chosen, selectorObj)
+    Configurations.AuctionSprinklersFilter = Configurations.AuctionSprinklersFilter or {}
+    local idx = table.find(Configurations.AuctionSprinklersFilter, chosen)
+    if idx then table.remove(Configurations.AuctionSprinklersFilter, idx) else table.insert(Configurations.AuctionSprinklersFilter, chosen) end
+    saveConfig()
+    selectorObj:UpdateSelectionText(Configurations.AuctionSprinklersFilter)
+end)
+
+UI.AuctionWateringCansSelector = Decode:AddSelector(UI.AuctionDrop, "Select Watering Cans", {}, function(chosen, selectorObj)
+    Configurations.AuctionWateringCansFilter = Configurations.AuctionWateringCansFilter or {}
+    local idx = table.find(Configurations.AuctionWateringCansFilter, chosen)
+    if idx then table.remove(Configurations.AuctionWateringCansFilter, idx) else table.insert(Configurations.AuctionWateringCansFilter, chosen) end
+    saveConfig()
+    selectorObj:UpdateSelectionText(Configurations.AuctionWateringCansFilter)
+end)
+
+UI.AuctionSeedPacksSelector = Decode:AddSelector(UI.AuctionDrop, "Select Seed Packs", {}, function(chosen, selectorObj)
+    Configurations.AuctionSeedPacksFilter = Configurations.AuctionSeedPacksFilter or {}
+    local idx = table.find(Configurations.AuctionSeedPacksFilter, chosen)
+    if idx then table.remove(Configurations.AuctionSeedPacksFilter, idx) else table.insert(Configurations.AuctionSeedPacksFilter, chosen) end
+    saveConfig()
+    selectorObj:UpdateSelectionText(Configurations.AuctionSeedPacksFilter)
+end)
+
+UI.AuctionSeedsSelector = Decode:AddSelector(UI.AuctionDrop, "Select Seeds", {}, function(chosen, selectorObj)
+    Configurations.AuctionSeedsFilter = Configurations.AuctionSeedsFilter or {}
+    local idx = table.find(Configurations.AuctionSeedsFilter, chosen)
+    if idx then table.remove(Configurations.AuctionSeedsFilter, idx) else table.insert(Configurations.AuctionSeedsFilter, chosen) end
+    saveConfig()
+    selectorObj:UpdateSelectionText(Configurations.AuctionSeedsFilter)
+end)
+
+UI.AuctionCratesSelector = Decode:AddSelector(UI.AuctionDrop, "Select Crates", {}, function(chosen, selectorObj)
+    Configurations.AuctionCratesFilter = Configurations.AuctionCratesFilter or {}
+    local idx = table.find(Configurations.AuctionCratesFilter, chosen)
+    if idx then table.remove(Configurations.AuctionCratesFilter, idx) else table.insert(Configurations.AuctionCratesFilter, chosen) end
+    saveConfig()
+    selectorObj:UpdateSelectionText(Configurations.AuctionCratesFilter)
+end)
+
+Decode:AddLabel(UI.AuctionDrop, "- [ Functions ] -")
+
+UI.BuyAuctionToggle = Decode:AddToggle(UI.AuctionDrop, "Buy Items", function(state)
+    Configurations.AutoBuyAuctionItems = state
+    saveConfig()
+end)
+
 task.spawn(function()
     task.wait(0.1)
 
@@ -1607,6 +1692,20 @@ task.spawn(function()
         UI.ClaimMailToggle.SliderNode.Position = UDim2.new(1, -14, 0.5, -6)
         UI.ClaimMailToggle.SliderNode.BackgroundColor3 = Decode.Theme.TextMain
     end
+
+    if Configurations.AuctionEggsFilter then UI.AuctionEggsSelector:UpdateSelectionText(Configurations.AuctionEggsFilter) end
+    if Configurations.AuctionSprinklersFilter then UI.AuctionSprinklersSelector:UpdateSelectionText(Configurations.AuctionSprinklersFilter) end
+    if Configurations.AuctionWateringCansFilter then UI.AuctionWateringCansSelector:UpdateSelectionText(Configurations.AuctionWateringCansFilter) end
+    if Configurations.AuctionSeedPacksFilter then UI.AuctionSeedPacksSelector:UpdateSelectionText(Configurations.AuctionSeedPacksFilter) end
+    if Configurations.AuctionSeedsFilter then UI.AuctionSeedsSelector:UpdateSelectionText(Configurations.AuctionSeedsFilter) end
+    if Configurations.AuctionCratesFilter then UI.AuctionCratesSelector:UpdateSelectionText(Configurations.AuctionCratesFilter) end
+
+    if Configurations.AutoBuyAuctionItems and UI.BuyAuctionToggle then
+        UI.BuyAuctionToggle.IsToggled = true
+        UI.BuyAuctionToggle.SwitchBg.BackgroundColor3 = Decode.Theme.AccentColor
+        UI.BuyAuctionToggle.SliderNode.Position = UDim2.new(1, -14, 0.5, -6)
+        UI.BuyAuctionToggle.SliderNode.BackgroundColor3 = Decode.Theme.TextMain
+    end
 end)
 
 task.spawn(function()
@@ -1621,23 +1720,30 @@ task.spawn(function()
         pcall(function() UI.PetSizeSelector:Populate(sizeAndTypeList) end)
     end
 
-    local mailboxFruitList = Decode:GetAssetCategory("Plants")
-    local mailboxPetList = Decode:GetAssetCategory("Pets")
-    local mailboxSeedsList = Decode:GetGameSeeds()
-    local mailboxSprinklersList = Decode:GetAssetCategory("Sprinklers")
-    local mailboxCansList = Decode:GetAssetCategory("WateringCans")
-    local mailboxCratesList = Decode:GetAssetCategory("Crates")
-    local mailboxPacksList = Decode:GetAssetCategory("SeedPacks")
-    local mailboxEggsList = Decode:GetAssetCategory("Eggs")
+    local FruitList = Decode:GetAssetCategory("Plants")
+    local PetList = Decode:GetAssetCategory("Pets")
+    local SeedsList = Decode:GetGameSeeds()
+    local SprinklersList = Decode:GetAssetCategory("Sprinklers")
+    local CansList = Decode:GetAssetCategory("WateringCans")
+    local CratesList = Decode:GetAssetCategory("Crates")
+    local PacksList = Decode:GetAssetCategory("SeedPacks")
+    local EggsList = Decode:GetAssetCategory("Eggs")
     
-    if UI.MailFruitsSelector and UI.MailFruitsSelector.Populate then pcall(function() UI.MailFruitsSelector:Populate(mailboxFruitList) end) end
-    if UI.MailPetsSelector and UI.MailPetsSelector.Populate then pcall(function() UI.MailPetsSelector:Populate(mailboxPetList) end) end
-    if UI.MailSeedsSelector and UI.MailSeedsSelector.Populate then pcall(function() UI.MailSeedsSelector:Populate(mailboxSeedsList) end) end
-    if UI.MailSprinklersSelector and UI.MailSprinklersSelector.Populate then pcall(function() UI.MailSprinklersSelector:Populate(mailboxSprinklersList) end) end
-    if UI.MailWateringCansSelector and UI.MailWateringCansSelector.Populate then pcall(function() UI.MailWateringCansSelector:Populate(mailboxCansList) end) end
-    if UI.MailCratesSelector and UI.MailCratesSelector.Populate then pcall(function() UI.MailCratesSelector:Populate(mailboxCratesList) end) end
-    if UI.MailSeedPacksSelector and UI.MailSeedPacksSelector.Populate then pcall(function() UI.MailSeedPacksSelector:Populate(mailboxPacksList) end) end
-    if UI.MailEggsSelector and UI.MailEggsSelector.Populate then pcall(function() UI.MailEggsSelector:Populate(mailboxEggsList) end) end
+    if UI.MailFruitsSelector and UI.MailFruitsSelector.Populate then pcall(function() UI.MailFruitsSelector:Populate(FruitList) end) end
+    if UI.MailPetsSelector and UI.MailPetsSelector.Populate then pcall(function() UI.MailPetsSelector:Populate(PetList) end) end
+    if UI.MailSeedsSelector and UI.MailSeedsSelector.Populate then pcall(function() UI.MailSeedsSelector:Populate(SeedsList) end) end
+    if UI.MailSprinklersSelector and UI.MailSprinklersSelector.Populate then pcall(function() UI.MailSprinklersSelector:Populate(SprinklersList) end) end
+    if UI.MailWateringCansSelector and UI.MailWateringCansSelector.Populate then pcall(function() UI.MailWateringCansSelector:Populate(CansList) end) end
+    if UI.MailCratesSelector and UI.MailCratesSelector.Populate then pcall(function() UI.MailCratesSelector:Populate(CratesList) end) end
+    if UI.MailSeedPacksSelector and UI.MailSeedPacksSelector.Populate then pcall(function() UI.MailSeedPacksSelector:Populate(PacksList) end) end
+    if UI.MailEggsSelector and UI.MailEggsSelector.Populate then pcall(function() UI.MailEggsSelector:Populate(EggsList) end) end
+
+    if UI.AuctionEggsSelector and UI.AuctionEggsSelector.Populate then pcall(function() UI.AuctionEggsSelector:Populate(EggsList) end) end
+    if UI.AuctionSprinklersSelector and UI.AuctionSprinklersSelector.Populate then pcall(function() UI.AuctionSprinklersSelector:Populate(SprinklersList) end) end
+    if UI.AuctionWateringCansSelector and UI.AuctionWateringCansSelector.Populate then pcall(function() UI.AuctionWateringCansSelector:Populate(CansList) end) end
+    if UI.AuctionSeedPacksSelector and UI.AuctionSeedPacksSelector.Populate then pcall(function() UI.AuctionSeedPacksSelector:Populate(PacksList) end) end
+    if UI.AuctionSeedsSelector and UI.AuctionSeedsSelector.Populate then pcall(function() UI.AuctionSeedsSelector:Populate(SeedsList) end) end
+    if UI.AuctionCratesSelector and UI.AuctionCratesSelector.Populate then pcall(function() UI.AuctionCratesSelector:Populate(CratesList) end) end
 end)
 
 UI.CloseTweenInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
