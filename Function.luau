@@ -1,3 +1,4 @@
+-- Test1
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
@@ -1619,7 +1620,7 @@ task.spawn(function()
     end
 end)
 
--- [[ NEW HIGH-EFFICIENCY TROWEL AUTOMATION MODULE - PART 1 ]]
+-- [[ SYSTEM AUTOMATION HIGH-SPEED TROWEL LOOP ]]
 task.spawn(function()
     local gameService = game
     local replicatedStorage = gameService:GetService("ReplicatedStorage")
@@ -1638,132 +1639,107 @@ task.spawn(function()
         end
     end)
 
-    while true do
-        task.wait(0.1)
-        local Configs = _G.DecodeAPI and _G.DecodeAPI.Configs
-        if type(Configs) ~= "table" then continue end
-        if not Configs.AutoTrowelToggleState or not Configs.TrowelSavedCFrame then continue end
+    local runThread
+    runThread = task.spawn(function()
+        while true do
+            task.wait(0.1)
 
-        local Character = localPlayer.Character
-        local Backpack = localPlayer:FindFirstChild("Backpack")
-        local HumanoidRootPart = Character and Character:FindFirstChild("HumanoidRootPart")
-        if not Character or not Backpack or not HumanoidRootPart then continue end
-
-        local gardensFolder = workspace:FindFirstChild("Gardens")
-        if not gardensFolder then continue end
-
-        -- Fast matrix lookup identifier
-        local myPlot = nil
-        for _, plot in ipairs(gardensFolder:GetChildren()) do
-            local idChild = plot:FindFirstChild("OwnerUserId")
-            local nameChild = plot:FindFirstChild("Owner")
-            local idVal = idChild and (idChild:IsA("ValueBase") and idChild.Value or idChild)
-            local nameVal = nameChild and (nameChild:IsA("ValueBase") and nameChild.Value or nameChild)
-            local idAttr = plot:GetAttribute("OwnerUserId")
-            local nameAttr = plot:GetAttribute("Owner")
-            
-            local matchId = (idVal == localPlayer.UserId) or (idAttr == localPlayer.UserId)
-            local matchName = (nameVal == localPlayer.Name) or (nameAttr == localPlayer.Name)
-            
-            if matchId or matchName or string.find(string.lower(plot.Name), string.lower(localPlayer.Name), 1, true) then
-                myPlot = plot
-                break
+            local configurationsTable = nil
+            pcall(function() configurationsTable = _G.DecodeAPI and _G.DecodeAPI.Configs end)
+            if type(configurationsTable) ~= "table" then continue end
+            if not configurationsTable.AutoTrowelToggleState or not configurationsTable.SavedTrowelPositions then
+                continue
             end
-        end
-        
-        -- High speed proximity distance lookup fallback tracking mechanism
-        if not myPlot then
-            local hrpPos = HumanoidRootPart.Position
-            local closestDist = math.huge
-            for _, plot in ipairs(gardensFolder:GetChildren()) do
-                local pivotPart = plot.PrimaryPart or plot:FindFirstChild("Floor") or plot:FindFirstChildOfClass("BasePart") or plot:FindFirstChildOfClass("MeshPart")
-                if pivotPart then
-                    local dist = (hrpPos - pivotPart.Position).Magnitude
-                    if dist < closestDist and dist < 200 then
-                        closestDist = dist
+
+            local Character = localPlayer.Character
+            local Backpack = localPlayer:FindFirstChild("Backpack")
+            if not Character or not Backpack then continue end
+
+            local ownPlotId = localPlayer:GetAttribute("PlotId")
+            local gardens = workspace:FindFirstChild("Gardens")
+            if not gardens then continue end
+
+            local myPlot = nil
+            if ownPlotId then
+                myPlot = gardens:FindFirstChild("Plot" .. tostring(ownPlotId))
+            end
+            if not myPlot then
+                for _, plot in ipairs(gardens:GetChildren()) do
+                    if string.find(string.lower(plot.Name), string.lower(localPlayer.Name), 1, true) then
                         myPlot = plot
-                    end
-                end
-            end
-        end
-        if not myPlot then continue end
-
-        local plantsFolder = myPlot:FindFirstChild("Plants")
-        if not plantsFolder then continue end
-
-        local plotAnchor = myPlot.PrimaryPart or myPlot:FindFirstChild("Floor") or myPlot:FindFirstChildOfClass("BasePart") or myPlot:FindFirstChildOfClass("MeshPart")
-        if not plotAnchor then continue end
-        
-        -- Translates matrix coordinate components completely error-free
-        local successPos, calculatedTargetCFrame = pcall(function()
-            local savedMatrix = CFrame.new(unpack(Configs.TrowelSavedCFrame))
-            return plotAnchor.CFrame:ToWorldSpace(savedMatrix)
-        end)
-        if not successPos or not calculatedTargetCFrame then continue end
-
-        local interval = tonumber(Configs.TrowelInterval) or 0
-        local waitDelay = (interval <= 0) and 0.1 or interval
-        -- [[ NEW HIGH-EFFICIENCY TROWEL AUTOMATION MODULE - PART 2 ]]
-        for _, plant in ipairs(plantsFolder:GetChildren()) do
-            if not Configs.AutoTrowelToggleState then break end
-            
-            -- Re-integrated your exact required growth tag constraint check
-            local isReady = plant:GetAttribute("PlantGrowthReady")
-            local plantId = plant:GetAttribute("PlantId") or plant:GetAttribute("Id")
-            local seedName = plant:GetAttribute("SeedName") or plant:GetAttribute("PlantName") or plant.Name
-            
-            if not isReady or not plantId or not seedName then continue end
-
-            -- Clean string matching strips spaces, dashes, and underscores to sync UI text perfectly
-            local isWhitelisted = false
-            if Configs.TrowelPlantsFilter and type(Configs.TrowelPlantsFilter) == "table" then
-                local cleanSeedName = tostring(seedName):lower():gsub("%s+", ""):gsub("_+", ""):gsub("-+", "")
-                
-                for _, filterName in ipairs(Configs.TrowelPlantsFilter) do
-                    local cleanFilterName = tostring(filterName):lower():gsub("%s+", ""):gsub("_+", ""):gsub("-+", "")
-                    
-                    if cleanSeedName == cleanFilterName or cleanSeedName:find(cleanFilterName, 1, true) or cleanFilterName:find(cleanSeedName, 1, true) then
-                        isWhitelisted = true
                         break
                     end
                 end
             end
-            if not isWhitelisted then continue end
+            if not myPlot then continue end
 
-            local primaryPart = plant.PrimaryPart or plant:FindFirstChildOfClass("BasePart")
-            local currentPos = primaryPart and primaryPart.Position
-            local targetWorldPos = calculatedTargetCFrame.Position
+            local plantsFolder = myPlot:FindFirstChild("Plants")
+            if not plantsFolder then continue end
+
+            local plotAnchor = myPlot.PrimaryPart or myPlot:FindFirstChild("Floor") or myPlot:FindFirstChildOfClass("BasePart") or myPlot:FindFirstChildOfClass("MeshPart")
+            if not plotAnchor then continue end
             
-            -- Validation check to skip plants already properly positioned
-            if not currentPos or (currentPos - targetWorldPos).Magnitude <= 1.5 then continue end
+            local successPos, targetWorldPos = pcall(function()
+                -- Decodes the raw table number components back into a full physical CFrame matrix object flawlessly
+                local unpackedCFrame = CFrame.new(unpack(configurationsTable.SavedTrowelPositions))
+                local basePos = plotAnchor.CFrame:ToWorldSpace(unpackedCFrame).Position
+                return Vector3.new(basePos.X, basePos.Y - 3.2, basePos.Z)
+            end)
+            if not successPos or not targetWorldPos then continue end
 
-            -- Automated tool equipping validation
-            local trowelTool = Character:FindFirstChild("Trowel")
-            if not trowelTool then
-                trowelTool = Backpack:FindFirstChild("Trowel")
-                if trowelTool then
-                    trowelTool.Parent = Character
-                    task.wait(0.05)
-                end
-            end
+            local interval = tonumber(configurationsTable.TrowelInterval) or 0
+            local waitDelay = (interval <= 0) and 0.1 or interval
 
-            pcall(function()
-                if TrowelRemote then
-                    local networkPos = Vector3.new(targetWorldPos.X, targetWorldPos.Y - 3.2, targetWorldPos.Z)
-                    
-                    if typeof(TrowelRemote) == "table" and type(TrowelRemote.Fire) == "function" then
-                        TrowelRemote:Fire(plantId, networkPos, 0)
-                    elseif typeof(TrowelRemote) == "userdata" or typeof(TrowelRemote) == "Instance" then
-                        TrowelRemote:FireServer(plantId, networkPos, 0)
-                    elseif type(TrowelRemote) == "function" then
-                        TrowelRemote(plantId, networkPos, 0)
+            for _, plant in ipairs(plantsFolder:GetChildren()) do
+                local isReady = plant:GetAttribute("PlantGrowthReady")
+                local plantId = plant:GetAttribute("PlantId")
+                local seedName = plant:GetAttribute("SeedName")
+                if not isReady or not plantId or not seedName then continue end
+
+                local isWhitelisted = false
+                if type(configurationsTable.TrowelPlantsFilter) == "table" then
+                    if table.find(configurationsTable.TrowelPlantsFilter, seedName) then
+                        isWhitelisted = true
                     end
                 end
-            end)
+                if not isWhitelisted then continue end
 
-            task.wait(waitDelay)
+                local primaryPart = plant.PrimaryPart or plant:FindFirstChildOfClass("BasePart")
+                local currentPos = primaryPart and primaryPart.Position
+                
+                if not currentPos or (currentPos - targetWorldPos).Magnitude <= 1.5 then continue end
+
+                local trowelTool = Character:FindFirstChild("Trowel")
+                if not trowelTool then
+                    trowelTool = Backpack:FindFirstChild("Trowel")
+                    if trowelTool then
+                        trowelTool.Parent = Character
+                        task.wait(0.05)
+                    end
+                end
+
+                pcall(function()
+                    if TrowelRemote then
+                        if typeof(TrowelRemote) == "table" and type(TrowelRemote.Fire) == "function" then
+                            TrowelRemote:Fire(plantId, targetWorldPos, 0)
+                        elseif typeof(TrowelRemote) == "userdata" or typeof(TrowelRemote) == "Instance" then
+                            TrowelRemote:FireServer(plantId, targetWorldPos, 0)
+                        elseif type(TrowelRemote) == "function" then
+                            TrowelRemote(plantId, targetWorldPos, 0)
+                        end
+                    end
+                end)
+
+                task.wait(waitDelay)
+            end
         end
-    end
+    end)
+
+    _G.TrowelAutomationLoop = {
+        Disconnect = function()
+            task.cancel(runThread)
+        end
+    }
 end)
 
 print("Decode: Function Loaded.")
