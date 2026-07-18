@@ -1,3 +1,4 @@
+-- f
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
@@ -1501,6 +1502,228 @@ task.spawn(function()
             task.wait(0.5)
         end
     end
+end)
+
+task.spawn(function()
+    local Players = game:GetService("Players")
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local Workspace = game:GetService("Workspace")
+    local LocalPlayer = Players.LocalPlayer
+
+    local networkingModule = ReplicatedStorage:FindFirstChild("SharedModules")
+    networkingModule = networkingModule and networkingModule:FindFirstChild("Networking")
+    local hasNet, Network = pcall(require, networkingModule)
+
+    while true do
+        task.wait(0.1)
+        local Configs = _G.DecodeAPI and _G.DecodeAPI.Configs
+
+        if Configs and Configs.AutoPotToggleState and hasNet and type(Network) == "table" then
+            local character = LocalPlayer.Character
+            local backpack = LocalPlayer:FindFirstChild("Backpack")
+
+            if character and backpack then
+                local placementPosition = Vector3.new(0, 0, 0)
+                if Configs.PotSavedCFrame and #Configs.PotSavedCFrame >= 12 then
+                    placementPosition = CFrame.new(unpack(Configs.PotSavedCFrame)).Position
+                end
+
+                local currentMode = tostring(Configs.PotModeSelection or ""):upper()
+
+                if currentMode == "PLACE" and placementPosition.Magnitude > 0 then
+                    local raycastParams = RaycastParams.new()
+                    raycastParams.FilterDescendantsInstances = {character}
+                    raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+                    
+                    local rayResult = Workspace:Raycast(placementPosition + Vector3.new(0, 2, 0), Vector3.new(0, -15, 0), raycastParams)
+                    local exactFloorY = rayResult and rayResult.Position.Y or placementPosition.Y
+                    local finalPlacementPos = Vector3.new(placementPosition.X, exactFloorY, placementPosition.Z)
+                    local placementRotation = 0.0
+
+                    local itemsToPlaceBatch = {}
+                    local combinedInventory = {}
+                    
+                    for _, item in ipairs(backpack:GetChildren()) do table.insert(combinedInventory, item) end
+                    for _, item in ipairs(character:GetChildren()) do table.insert(combinedInventory, item) end
+
+                    for _, tool in ipairs(combinedInventory) do
+                        if tool:IsA("Tool") then
+                            local plantId = tool:GetAttribute("Id") or tool:GetAttribute("PlantId")
+                            if plantId and plantId ~= "" then
+                                local cleanName = tool.Name:gsub(" %s*%[Potted%]", ""):gsub("%s* %[Potted%]", "")
+                                
+                                if Configs.PotPlantsFilter and table.find(Configs.PotPlantsFilter, cleanName) then
+                                    table.insert(itemsToPlaceBatch, plantId)
+                                end
+                            end
+                        end
+                    end
+
+                    for index = 1, #itemsToPlaceBatch do
+                        if not Configs.AutoPotToggleState or tostring(Configs.PotModeSelection or ""):upper() ~= "PLACE" then break end
+                        local targetId = itemsToPlaceBatch[index]
+
+                        pcall(function()
+                            if Network.PotPlacement and Network.PotPlacement.PlacePottedPlant then
+                                local placeObj = Network.PotPlacement.PlacePottedPlant
+                                local methodHook = type(placeObj.FireServer) == "function" and "FireServer" or "Fire"
+                                placeObj[methodHook](placeObj, finalPlacementPos, placementRotation, targetId)
+                            elseif type(Network.Fire) == "function" then
+                                Network.Fire("PotPlacementPlacePottedPlant", finalPlacementPos, placementRotation, targetId)
+                            end
+                        end)
+                        task.wait(0.3)
+                    end
+
+                elseif currentMode == "PICKUP" then
+                    local userIdString = tostring(LocalPlayer.UserId)
+                    local gardensFolder = Workspace:FindFirstChild("Gardens")
+
+                    if gardensFolder then
+                        for _, plotModel in ipairs(gardensFolder:GetChildren()) do
+                            local plantsFolder = plotModel:FindFirstChild("Plants")
+                            if plantsFolder then
+                                for _, plantInstance in ipairs(plantsFolder:GetChildren()) do
+                                    if not Configs.AutoPotToggleState or tostring(Configs.PotModeSelection or ""):upper() ~= "PICKUP" then break end
+                                    
+                                    if plantInstance.Name:sub(1, #userIdString) == userIdString and plantInstance:FindFirstChild("PotVisual") then
+                                        local plantSeedNameAttr = plantInstance:GetAttribute("PlantName") or plantInstance:GetAttribute("SeedName") or ""
+                                        
+                                        if Configs.PotPlantsFilter and table.find(Configs.PotPlantsFilter, tostring(plantSeedNameAttr)) then
+                                            local targetPlantId = plantInstance:GetAttribute("Id") or plantInstance:GetAttribute("PlantId")
+                                            if not targetPlantId or targetPlantId == "" then
+                                                local splitName = plantInstance.Name:split("_")
+                                                if splitName and #splitName >= 2 then targetPlantId = splitName[2] end
+                                            end
+
+                                            if targetPlantId and targetPlantId ~= "" then
+                                                pcall(function()
+                                                    if Network.PotPlacement and Network.PotPlacement.PickUpPottedPlant then
+                                                        local pickUpObj = Network.PotPlacement.PickUpPottedPlant
+                                                        local methodHook = type(pickUpObj.FireServer) == "function" and "FireServer" or "Fire"
+                                                        pickUpObj[methodHook](pickUpObj, targetPlantId)
+                                                    elseif type(Network.Fire) == "function" then
+                                                        Network.Fire("PotPlacementPickUpPottedPlant", targetPlantId)
+                                                    end
+                                                end)
+                                                task.wait(0.01)
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+task.spawn(function()
+    local gameService = game
+    local replicatedStorage = gameService:GetService("ReplicatedStorage")
+    local playersService = gameService:GetService("Players")
+    local localPlayer = playersService.LocalPlayer or playersService:WaitForChild("LocalPlayer", 5) or playersService.PlayerAdded:Wait()
+    
+    local TrowelRemote = nil
+    pcall(function()
+        local sharedModules = replicatedStorage:FindFirstChild("SharedModules")
+        local targetModule = sharedModules and sharedModules:FindFirstChild("Networking")
+        if targetModule then
+            local networkData = require(targetModule)
+            if networkData and networkData.Trowel then
+                TrowelRemote = networkData.Trowel.MovePlant
+            end
+        end
+    end)
+
+    task.spawn(function()
+        while true do
+            task.wait(0.1)
+            local Configs = _G.DecodeAPI and _G.DecodeAPI.Configs
+            if type(Configs) ~= "table" then continue end
+            if not Configs.AutoTrowelToggleState or not Configs.TrowelSavedCFrame then continue end
+
+            local Character = localPlayer.Character
+            local Backpack = localPlayer:FindFirstChild("Backpack")
+            if not Character or not Backpack then continue end
+
+            local ownPlotId = localPlayer:GetAttribute("PlotId")
+            local gardens = workspace:FindFirstChild("Gardens")
+            if not gardens then continue end
+
+            local myPlot = nil
+            if ownPlotId then
+                myPlot = gardens:FindFirstChild("Plot" .. tostring(ownPlotId))
+            end
+            if not myPlot then
+                for _, plot in ipairs(gardens:GetChildren()) do
+                    if string.find(string.lower(plot.Name), string.lower(localPlayer.Name), 1, true) then
+                        myPlot = plot
+                        break
+                    end
+                end
+            end
+            if not myPlot then continue end
+
+            local plantsFolder = myPlot:FindFirstChild("Plants")
+            if not plantsFolder then continue end
+
+            local plotAnchor = myPlot.PrimaryPart or myPlot:FindFirstChild("Floor") or myPlot:FindFirstChildOfClass("BasePart") or myPlot:FindFirstChildOfClass("MeshPart")
+            if not plotAnchor then continue end
+            
+            local successPos, targetWorldPos = pcall(function()
+                -- Fixed unpack layout formatting to natively process the array entries
+                local unpackedCFrame = CFrame.new(unpack(Configs.TrowelSavedCFrame))
+                local basePos = plotAnchor.CFrame:ToWorldSpace(unpackedCFrame).Position
+                return Vector3.new(basePos.X, basePos.Y - 3.2, basePos.Z)
+            end)
+            if not successPos or not targetWorldPos then continue end
+
+            local interval = tonumber(Configs.TrowelInterval) or 0
+            local waitDelay = (interval <= 0) and 0.1 or interval
+
+            for _, plant in ipairs(plantsFolder:GetChildren()) do
+                if not Configs.AutoTrowelToggleState then break end
+                
+                local isReady = plant:GetAttribute("PlantGrowthReady")
+                local plantId = plant:GetAttribute("PlantId")
+                local seedName = plant:GetAttribute("SeedName")
+                if not isReady or not plantId or not seedName then continue end
+
+                if Configs.TrowelPlantsFilter and table.find(Configs.TrowelPlantsFilter, tostring(seedName)) then
+                    local primaryPart = plant.PrimaryPart or plant:FindFirstChildOfClass("BasePart")
+                    local currentPos = primaryPart and primaryPart.Position
+                    
+                    if not currentPos or (currentPos - targetWorldPos).Magnitude <= 1.5 then continue end
+
+                    local trowelTool = Character:FindFirstChild("Trowel")
+                    if not trowelTool then
+                        trowelTool = Backpack:FindFirstChild("Trowel")
+                        if trowelTool then
+                            trowelTool.Parent = Character
+                            task.wait(0.05)
+                        end
+                    end
+
+                    pcall(function()
+                        if TrowelRemote then
+                            if typeof(TrowelRemote) == "table" and type(TrowelRemote.Fire) == "function" then
+                                TrowelRemote:Fire(plantId, targetWorldPos, 0)
+                            elseif typeof(TrowelRemote) == "userdata" or typeof(TrowelRemote) == "Instance" then
+                                TrowelRemote:FireServer(plantId, targetWorldPos, 0)
+                            elseif type(TrowelRemote) == "function" then
+                                TrowelRemote(plantId, targetWorldPos, 0)
+                            end
+                        end
+                    end)
+
+                    task.wait(waitDelay)
+                end
+            end
+        end
+    end)
 end)
 
 print("Decode: Function Loaded.")
