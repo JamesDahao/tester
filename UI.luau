@@ -1,3 +1,4 @@
+--1
 local Decode = {}
 
 local CoreGui = game:GetService("CoreGui")
@@ -48,14 +49,28 @@ local Configurations = {
     SelectedPetsFilter = {},
     SelectedPetSizeFilter = {},
     AutoBuyPets = false,
-    CollectTweenSpeed = 0,
-    AutoCollectEventSeeds = false
+    CollectTweenSpeed = 16,
+    AutoCollectEventSeeds = false,
+    MailTargetUser = "",
+    MailSendQuantity = 0,
+    MailSendInterval = 0,
+    MailPetsFilter = {},
+    MailFruitsFilter = {},
+    MailSeedsFilter = {},
+    MailSprinklersFilter = {},
+    MailWateringCansFilter = {},
+    MailCratesFilter = {},
+    MailSeedPacksFilter = {},
+    MailEggsFilter = {},
+    MailToolsFilter = {},
+    SendMailEnabled = false,
+    ClaimMailEnabled = false
 }
 
 local UI = {
     Tabs = {},
     FirstTab = nil,
-    PageList = {"Home", "Main", "Assist", "Shop", "Misc"},
+    PageList = {"Home", "Main", "Assist", "Shop", "Misc", "Settings"},
     CreatedPages = {},
     PlayerTracker = { OriginalSpeed = 16 }
 }
@@ -1185,6 +1200,148 @@ UI.CollectSeedsToggle = Decode:AddToggle(UI.CollectDrop, "Collect All Event Seed
     saveConfig()
 end)
 
+UI.MailboxDrop = Decode:CreateDropdown(UI.CreatedPages["Assist"], "Mailbox")
+
+Decode:AddLabel(UI.MailboxDrop, "- [ Configs ] -")
+
+local TargetFrame = Instance.new("Frame")
+TargetFrame.Size = UDim2.new(1, 0, 0, 36)
+TargetFrame.BackgroundColor3 = Decode.Theme.ElementBackground
+TargetFrame.BackgroundTransparency = 0.6
+TargetFrame.Parent = UI.MailboxDrop
+
+local TargetCorner = Instance.new("UICorner")
+TargetCorner.CornerRadius = UDim.new(0, 6)
+TargetCorner.Parent = TargetFrame
+
+local TargetLabel = Instance.new("TextLabel")
+TargetLabel.Size = UDim2.new(0, 150, 1, 0)
+TargetLabel.Position = UDim2.new(0, 10, 0, 0)
+TargetLabel.BackgroundTransparency = 1
+TargetLabel.Text = "Send Target"
+TargetLabel.TextColor3 = Decode.Theme.TextMain
+TargetLabel.TextSize = 13
+TargetLabel.Font = Enum.Font.SourceSansBold
+TargetLabel.TextXAlignment = Enum.TextXAlignment.Left
+TargetLabel.Parent = TargetFrame
+
+UI.MailTargetBox = Instance.new("TextBox")
+UI.MailTargetBox.Size = UDim2.new(0, 120, 0, 26)
+UI.MailTargetBox.Position = UDim2.new(1, -130, 0.5, -13)
+UI.MailTargetBox.BackgroundColor3 = Decode.Theme.MainBackground
+UI.MailTargetBox.Text = Configurations.MailTargetUser or ""
+UI.MailTargetBox.PlaceholderText = "username"
+UI.MailTargetBox.PlaceholderColor3 = Decode.Theme.TextMuted
+UI.MailTargetBox.TextColor3 = Decode.Theme.TextMain
+UI.MailTargetBox.TextSize = 12
+UI.MailTargetBox.Font = Enum.Font.SourceSans
+UI.MailTargetBox.Parent = TargetFrame
+
+local MailBoxCorner = Instance.new("UICorner")
+MailBoxCorner.CornerRadius = UDim.new(0, 6)
+MailBoxCorner.Parent = UI.MailTargetBox
+
+UI.MailTargetBox.FocusLost:Connect(function()
+    Configurations.MailTargetUser = UI.MailTargetBox.Text
+    saveConfig()
+end)
+
+UI.MailQuantitySlider = Decode:AddSlider(UI.MailboxDrop, "Send Quantity", Configurations.MailSendQuantity or 0, function(value)
+    Configurations.MailSendQuantity = value
+    saveConfig()
+end)
+
+UI.MailIntervalSlider = Decode:AddSlider(UI.MailboxDrop, "Send Interval", Configurations.MailSendInterval or 0, function(value)
+    Configurations.MailSendInterval = value
+    saveConfig()
+end)
+
+Decode:AddLabel(UI.MailboxDrop, "- [ Options ] -")
+
+UI.MailPetsSelector = Decode:AddSelector(UI.MailboxDrop, "Select Pets", {}, function(chosen, selectorObj)
+    Configurations.MailPetsFilter = Configurations.MailPetsFilter or {}
+    local idx = table.find(Configurations.MailPetsFilter, chosen)
+    if idx then table.remove(Configurations.MailPetsFilter, idx) else table.insert(Configurations.MailPetsFilter, chosen) end
+    saveConfig()
+    selectorObj:UpdateSelectionText(Configurations.MailPetsFilter)
+end)
+
+UI.MailFruitsSelector = Decode:AddSelector(UI.MailboxDrop, "Select Fruits", {}, function(chosen, selectorObj)
+    Configurations.MailFruitsFilter = Configurations.MailFruitsFilter or {}
+    local idx = table.find(Configurations.MailFruitsFilter, chosen)
+    if idx then table.remove(Configurations.MailFruitsFilter, idx) else table.insert(Configurations.MailFruitsFilter, chosen) end
+    saveConfig()
+    selectorObj:UpdateSelectionText(Configurations.MailFruitsFilter)
+end)
+
+UI.MailSeedsSelector = Decode:AddSelector(UI.MailboxDrop, "Select Seeds", {}, function(chosen, selectorObj)
+    Configurations.MailSeedsFilter = Configurations.MailSeedsFilter or {}
+    local idx = table.find(Configurations.MailSeedsFilter, chosen)
+    if idx then table.remove(Configurations.MailSeedsFilter, idx) else table.insert(Configurations.MailSeedsFilter, chosen) end
+    saveConfig()
+    selectorObj:UpdateSelectionText(Configurations.MailSeedsFilter)
+end)
+
+UI.MailSprinklersSelector = Decode:AddSelector(UI.MailboxDrop, "Select Sprinklers", {}, function(chosen, selectorObj)
+    Configurations.MailSprinklersFilter = Configurations.MailSprinklersFilter or {}
+    local idx = table.find(Configurations.MailSprinklersFilter, chosen)
+    if idx then table.remove(Configurations.MailSprinklersFilter, idx) else table.insert(Configurations.MailSprinklersFilter, chosen) end
+    saveConfig()
+    selectorObj:UpdateSelectionText(Configurations.MailSprinklersFilter)
+end)
+
+UI.MailWateringCansSelector = Decode:AddSelector(UI.MailboxDrop, "Select Watering Cans", {}, function(chosen, selectorObj)
+    Configurations.MailWateringCansFilter = Configurations.MailWateringCansFilter or {}
+    local idx = table.find(Configurations.MailWateringCansFilter, chosen)
+    if idx then table.remove(Configurations.MailWateringCansFilter, idx) else table.insert(Configurations.MailWateringCansFilter, chosen) end
+    saveConfig()
+    selectorObj:UpdateSelectionText(Configurations.MailWateringCansFilter)
+end)
+
+UI.MailCratesSelector = Decode:AddSelector(UI.MailboxDrop, "Select Crates", {}, function(chosen, selectorObj)
+    Configurations.MailCratesFilter = Configurations.MailCratesFilter or {}
+    local idx = table.find(Configurations.MailCratesFilter, chosen)
+    if idx then table.remove(Configurations.MailCratesFilter, idx) else table.insert(Configurations.MailCratesFilter, chosen) end
+    saveConfig()
+    selectorObj:UpdateSelectionText(Configurations.MailCratesFilter)
+end)
+
+UI.MailSeedPacksSelector = Decode:AddSelector(UI.MailboxDrop, "Select Seed Packs", {}, function(chosen, selectorObj)
+    Configurations.MailSeedPacksFilter = Configurations.MailSeedPacksFilter or {}
+    local idx = table.find(Configurations.MailSeedPacksFilter, chosen)
+    if idx then table.remove(Configurations.MailSeedPacksFilter, idx) else table.insert(Configurations.MailSeedPacksFilter, chosen) end
+    saveConfig()
+    selectorObj:UpdateSelectionText(Configurations.MailSeedPacksFilter)
+end)
+
+UI.MailEggsSelector = Decode:AddSelector(UI.MailboxDrop, "Select Eggs", {}, function(chosen, selectorObj)
+    Configurations.MailEggsFilter = Configurations.MailEggsFilter or {}
+    local idx = table.find(Configurations.MailEggsFilter, chosen)
+    if idx then table.remove(Configurations.MailEggsFilter, idx) else table.insert(Configurations.MailEggsFilter, chosen) end
+    saveConfig()
+    selectorObj:UpdateSelectionText(Configurations.MailEggsFilter)
+end)
+
+UI.MailToolsSelector = Decode:AddSelector(UI.MailboxDrop, "Select Tools", {"Basic Pot", "Trowel"}, function(chosen, selectorObj)
+    Configurations.MailToolsFilter = Configurations.MailToolsFilter or {}
+    local idx = table.find(Configurations.MailToolsFilter, chosen)
+    if idx then table.remove(Configurations.MailToolsFilter, idx) else table.insert(Configurations.MailToolsFilter, chosen) end
+    saveConfig()
+    selectorObj:UpdateSelectionText(Configurations.MailToolsFilter)
+end)
+
+Decode:AddLabel(UI.MailboxDrop, "- [ Functions ] -")
+
+UI.SendMailToggle = Decode:AddToggle(UI.MailboxDrop, "Send Mail", function(state)
+    Configurations.SendMailEnabled = state
+    saveConfig()
+end)
+
+UI.ClaimMailToggle = Decode:AddToggle(UI.MailboxDrop, "Claim Mail", function(state)
+    Configurations.ClaimMailEnabled = state
+    saveConfig()
+end)
+
 task.spawn(function()
     task.wait(0.1)
 
@@ -1304,6 +1461,30 @@ task.spawn(function()
         UI.CollectSeedsToggle.SliderNode.Position = UDim2.new(1, -14, 0.5, -6)
         UI.CollectSeedsToggle.SliderNode.BackgroundColor3 = Decode.Theme.TextMain
     end
+
+    if Configurations.MailFruitsFilter then UI.MailFruitsSelector:UpdateSelectionText(Configurations.MailFruitsFilter) end
+    if Configurations.MailPetsFilter then UI.MailPetsSelector:UpdateSelectionText(Configurations.MailPetsFilter) end
+    if Configurations.MailSeedsFilter then UI.MailSeedsSelector:UpdateSelectionText(Configurations.MailSeedsFilter) end
+    if Configurations.MailSprinklersFilter then UI.MailSprinklersSelector:UpdateSelectionText(Configurations.MailSprinklersFilter) end
+    if Configurations.MailWateringCansFilter then UI.MailWateringCansSelector:UpdateSelectionText(Configurations.MailWateringCansFilter) end
+    if Configurations.MailCratesFilter then UI.MailCratesSelector:UpdateSelectionText(Configurations.MailCratesFilter) end
+    if Configurations.MailSeedPacksFilter then UI.MailSeedPacksSelector:UpdateSelectionText(Configurations.MailSeedPacksFilter) end
+    if Configurations.MailEggsFilter then UI.MailEggsSelector:UpdateSelectionText(Configurations.MailEggsFilter) end
+    if Configurations.MailToolsFilter then UI.MailToolsSelector:UpdateSelectionText(Configurations.MailToolsFilter) end
+
+    if Configurations.SendMailEnabled and UI.SendMailToggle then
+        UI.SendMailToggle.IsToggled = true
+        UI.SendMailToggle.SwitchBg.BackgroundColor3 = Decode.Theme.AccentColor
+        UI.SendMailToggle.SliderNode.Position = UDim2.new(1, -14, 0.5, -6)
+        UI.SendMailToggle.SliderNode.BackgroundColor3 = Decode.Theme.TextMain
+    end
+
+    if Configurations.ClaimMailEnabled and UI.ClaimMailToggle then
+        UI.ClaimMailToggle.IsToggled = true
+        UI.ClaimMailToggle.SwitchBg.BackgroundColor3 = Decode.Theme.AccentColor
+        UI.ClaimMailToggle.SliderNode.Position = UDim2.new(1, -14, 0.5, -6)
+        UI.ClaimMailToggle.SliderNode.BackgroundColor3 = Decode.Theme.TextMain
+    end
 end)
 
 task.spawn(function()
@@ -1317,6 +1498,24 @@ task.spawn(function()
     if UI.PetSizeSelector and UI.PetSizeSelector.Populate then
         pcall(function() UI.PetSizeSelector:Populate(sizeAndTypeList) end)
     end
+
+    local mailboxFruitList = Decode:GetAssetCategory("Plants")
+    local mailboxPetList = Decode:GetAssetCategory("Pets")
+    local mailboxSeedsList = Decode:GetAssetCategory("Seeds")
+    local mailboxSprinklersList = Decode:GetAssetCategory("Sprinklers")
+    local mailboxCansList = Decode:GetAssetCategory("WateringCans")
+    local mailboxCratesList = Decode:GetAssetCategory("Crates")
+    local mailboxPacksList = Decode:GetAssetCategory("SeedPacks")
+    local mailboxEggsList = Decode:GetAssetCategory("Eggs")
+    
+    if UI.MailFruitsSelector and UI.MailFruitsSelector.Populate then pcall(function() UI.MailFruitsSelector:Populate(mailboxFruitList) end) end
+    if UI.MailPetsSelector and UI.MailPetsSelector.Populate then pcall(function() UI.MailPetsSelector:Populate(mailboxPetList) end) end
+    if UI.MailSeedsSelector and UI.MailSeedsSelector.Populate then pcall(function() UI.MailSeedsSelector:Populate(mailboxSeedsList) end) end
+    if UI.MailSprinklersSelector and UI.MailSprinklersSelector.Populate then pcall(function() UI.MailSprinklersSelector:Populate(mailboxSprinklersList) end) end
+    if UI.MailWateringCansSelector and UI.MailWateringCansSelector.Populate then pcall(function() UI.MailWateringCansSelector:Populate(mailboxCansList) end) end
+    if UI.MailCratesSelector and UI.MailCratesSelector.Populate then pcall(function() UI.MailCratesSelector:Populate(mailboxCratesList) end) end
+    if UI.MailSeedPacksSelector and UI.MailSeedPacksSelector.Populate then pcall(function() UI.MailSeedPacksSelector:Populate(mailboxPacksList) end) end
+    if UI.MailEggsSelector and UI.MailEggsSelector.Populate then pcall(function() UI.MailEggsSelector:Populate(mailboxEggsList) end) end
 end)
 
 UI.CloseTweenInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
