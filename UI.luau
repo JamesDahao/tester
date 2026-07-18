@@ -1,4 +1,3 @@
---test
 local Decode = {}
 
 local CoreGui = game:GetService("CoreGui")
@@ -83,7 +82,11 @@ local Configurations = {
     BuyAllGears = false,
     ShopPropsFilter = {},
     BuyProps = false,
-    BuyAllProps = false
+    BuyAllProps = false,
+    PlantInterval = 0,
+    PlantSeedsFilter = {},
+    PlantPositionMode = "",
+    AutoPlantEnabled = false
 }
 
 local UI = {
@@ -1499,6 +1502,42 @@ UI.ClaimMailToggle = Decode:AddToggle(UI.MailboxDrop, "Claim Mail", function(sta
     saveConfig()
 end)
 
+UI.PlantingDrop = Decode:CreateDropdown(UI.CreatedPages["Assist"], "Planting")
+
+Decode:AddLabel(UI.PlantingDrop, "- [ Configs ] -")
+
+UI.PlantIntervalSlider = Decode:AddSlider(UI.PlantingDrop, "Plant Interval", Configurations.PlantInterval or 0, function(value)
+    Configurations.PlantInterval = value
+    saveConfig()
+end)
+
+Decode:AddLabel(UI.PlantingDrop, "- [ Options ] -")
+
+UI.PlantSeedsSelector = Decode:AddSelector(UI.PlantingDrop, "Select Seeds", {}, function(chosen, selectorObj)
+    Configurations.PlantSeedsFilter = Configurations.PlantSeedsFilter or {}
+    local idx = table.find(Configurations.PlantSeedsFilter, chosen)
+    if idx then table.remove(Configurations.PlantSeedsFilter, idx) else table.insert(Configurations.PlantSeedsFilter, chosen) end
+    saveConfig()
+    selectorObj:UpdateSelectionText(Configurations.PlantSeedsFilter)
+end)
+
+UI.PlantPositionSelector = Decode:AddSelector(UI.PlantingDrop, "Select Position", {"Sprinkler Radius", "Random", "Player Front"}, function(chosen, selectorObj)
+    if selectorObj.SelectBtn.Text == chosen then
+        Configurations.PlantPositionMode = ""
+    else
+        Configurations.PlantPositionMode = chosen
+    end
+    saveConfig()
+    selectorObj:UpdateSelectionText(Configurations.PlantPositionMode)
+end)
+
+Decode:AddLabel(UI.PlantingDrop, "- [ Function ] -")
+
+UI.AutoPlantToggle = Decode:AddToggle(UI.PlantingDrop, "Plant", function(state)
+    Configurations.AutoPlantEnabled = state
+    saveConfig()
+end)
+
 UI.AuctionDrop = Decode:CreateDropdown(UI.CreatedPages["Shop"], "Auction")
 
 Decode:AddLabel(UI.AuctionDrop, "- [ Configs ] -")
@@ -1907,6 +1946,16 @@ task.spawn(function()
         UI.BuyAllPropsToggle.SliderNode.Position = UDim2.new(1, -14, 0.5, -6)
         UI.BuyAllPropsToggle.SliderNode.BackgroundColor3 = Decode.Theme.TextMain
     end
+
+    if Configurations.PlantSeedsFilter then UI.PlantSeedsSelector:UpdateSelectionText(Configurations.PlantSeedsFilter) end
+    if Configurations.PlantPositionMode and Configurations.PlantPositionMode ~= "" then UI.PlantPositionSelector:UpdateSelectionText(Configurations.PlantPositionMode) end
+
+    if Configurations.AutoPlantEnabled and UI.AutoPlantToggle then
+        UI.AutoPlantToggle.IsToggled = true
+        UI.AutoPlantToggle.SwitchBg.BackgroundColor3 = Decode.Theme.AccentColor
+        UI.AutoPlantToggle.SliderNode.Position = UDim2.new(1, -14, 0.5, -6)
+        UI.AutoPlantToggle.SliderNode.BackgroundColor3 = Decode.Theme.TextMain
+    end
 end)
 
 task.spawn(function()
@@ -1938,6 +1987,9 @@ task.spawn(function()
     if UI.MailCratesSelector and UI.MailCratesSelector.Populate then pcall(function() UI.MailCratesSelector:Populate(CratesList) end) end
     if UI.MailSeedPacksSelector and UI.MailSeedPacksSelector.Populate then pcall(function() UI.MailSeedPacksSelector:Populate(PacksList) end) end
     if UI.MailEggsSelector and UI.MailEggsSelector.Populate then pcall(function() UI.MailEggsSelector:Populate(EggsList) end) end
+    
+    if UI.PlantSeedsSelector and UI.PlantSeedsSelector.Populate then pcall(function() UI.PlantSeedsSelector:Populate(SeedsList) end) end
+
 
     if UI.AuctionEggsSelector and UI.AuctionEggsSelector.Populate then pcall(function() UI.AuctionEggsSelector:Populate(EggsList) end) end
     if UI.AuctionSprinklersSelector and UI.AuctionSprinklersSelector.Populate then pcall(function() UI.AuctionSprinklersSelector:Populate(SprinklersList) end) end
