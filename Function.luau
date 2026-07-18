@@ -1,4 +1,3 @@
--- F
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
@@ -1638,59 +1637,68 @@ task.spawn(function()
         end
     end)
 
-    while true do
-        task.wait(0.1)
-        local Configs = _G.DecodeAPI and _G.DecodeAPI.Configs
-        if type(Configs) ~= "table" then continue end
-        if not Configs.AutoTrowelToggleState or not Configs.TrowelSavedCFrame then continue end
+    local runThread
+    runThread = task.spawn(function()
+        while true do
+            task.wait(0.1)
 
-        local Character = localPlayer.Character
-        local Backpack = localPlayer:FindFirstChild("Backpack")
-        if not Character or not Backpack then continue end
+            local configurationsTable = nil
+            pcall(function() configurationsTable = _G.DecodeAPI and _G.DecodeAPI.Configs end)
+            if type(configurationsTable) ~= "table" then continue end
+            if not configurationsTable.AutoTrowelToggleState or not configurationsTable.TrowelSavedCFrame then
+                continue
+            end
 
-        local ownPlotId = localPlayer:GetAttribute("PlotId")
-        local gardens = workspace:FindFirstChild("Gardens")
-        if not gardens then continue end
+            local Character = localPlayer.Character
+            local Backpack = localPlayer:FindFirstChild("Backpack")
+            if not Character or not Backpack then continue end
 
-        local myPlot = nil
-        if ownPlotId then
-            myPlot = gardens:FindFirstChild("Plot" .. tostring(ownPlotId))
-        end
-        if not myPlot then
-            for _, plot in ipairs(gardens:GetChildren()) do
-                if string.find(string.lower(plot.Name), string.lower(localPlayer.Name), 1, true) then
-                    myPlot = plot
-                    break
+            local ownPlotId = localPlayer:GetAttribute("PlotId")
+            local gardens = workspace:FindFirstChild("Gardens")
+            if not gardens then continue end
+
+            local myPlot = nil
+            if ownPlotId then
+                myPlot = gardens:FindFirstChild("Plot" .. tostring(ownPlotId))
+            end
+            if not myPlot then
+                for _, plot in ipairs(gardens:GetChildren()) do
+                    if string.find(string.lower(plot.Name), string.lower(localPlayer.Name), 1, true) then
+                        myPlot = plot
+                        break
+                    end
                 end
             end
-        end
-        if not myPlot then continue end
+            if not myPlot then continue end
+            local plantsFolder = myPlot:FindFirstChild("Plants")
+            if not plantsFolder then continue end
 
-        local plantsFolder = myPlot:FindFirstChild("Plants")
-        if not plantsFolder then continue end
+            local plotAnchor = myPlot.PrimaryPart or myPlot:FindFirstChild("Floor") or myPlot:FindFirstChildOfClass("BasePart") or myPlot:FindFirstChildOfClass("MeshPart")
+            if not plotAnchor then continue end
+            local successPos, targetWorldPos = pcall(function()
+                local unpackedCFrame = CFrame.new(unpack(configurationsTable.TrowelSavedCFrame))
+                local basePos = plotAnchor.CFrame:ToWorldSpace(unpackedCFrame).Position
+                return Vector3.new(basePos.X, basePos.Y - 3.2, basePos.Z)
+            end)
+            if not successPos or not targetWorldPos then continue end
 
-        local plotAnchor = myPlot.PrimaryPart or myPlot:FindFirstChild("Floor") or myPlot:FindFirstChildOfClass("BasePart") or myPlot:FindFirstChildOfClass("MeshPart")
-        if not plotAnchor then continue end
-        
-        local successPos, targetWorldPos = pcall(function()
-            local unpackedCFrame = CFrame.new(unpack(Configs.TrowelSavedCFrame))
-            local basePos = plotAnchor.CFrame:ToWorldSpace(unpackedCFrame).Position
-            return Vector3.new(basePos.X, basePos.Y - 3.2, basePos.Z)
-        end)
-        if not successPos or not targetWorldPos then continue end
+            local interval = tonumber(configurationsTable.TrowelInterval) or 0
+            local waitDelay = (interval <= 0) and 0.1 or interval
 
-        local interval = tonumber(Configs.TrowelInterval) or 0
-        local waitDelay = (interval <= 0) and 0.1 or interval
-        -- [[ SYSTEM AUTOMATION HIGH-SPEED TROWEL LOOP - PART 2 ]]
-        for _, plant in ipairs(plantsFolder:GetChildren()) do
-            if not Configs.AutoTrowelToggleState then break end
-            
-            local isReady = plant:GetAttribute("PlantGrowthReady")
-            local plantId = plant:GetAttribute("PlantId")
-            local seedName = plant:GetAttribute("SeedName")
-            if not isReady or not plantId or not seedName then continue end
+            for _, plant in ipairs(plantsFolder:GetChildren()) do
+                local isReady = plant:GetAttribute("PlantGrowthReady")
+                local plantId = plant:GetAttribute("PlantId")
+                local seedName = plant:GetAttribute("SeedName")
+                if not isReady or not plantId or not seedName then continue end
 
-            if Configs.TrowelPlantsFilter and table.find(Configs.TrowelPlantsFilter, tostring(seedName)) then
+                local isWhitelisted = false
+                if type(configurationsTable.TrowelPlantsFilter) == "table" then
+                    if table.find(configurationsTable.TrowelPlantsFilter, seedName) then
+                        isWhitelisted = true
+                    end
+                end
+                if not isWhitelisted then continue end
+
                 local primaryPart = plant.PrimaryPart or plant:FindFirstChildOfClass("BasePart")
                 local currentPos = primaryPart and primaryPart.Position
                 
@@ -1720,7 +1728,7 @@ task.spawn(function()
                 task.wait(waitDelay)
             end
         end
-    end
+    end)
 end)
 
 print("Decode: Function Loaded.")
