@@ -1,3 +1,4 @@
+--1
 local Decode = {}
 
 local CoreGui = game:GetService("CoreGui")
@@ -356,6 +357,113 @@ UI.PageHeaderLabel.TextSize = 22
 UI.PageHeaderLabel.Font = Enum.Font.SourceSansBold
 UI.PageHeaderLabel.TextXAlignment = Enum.TextXAlignment.Left
 UI.PageHeaderLabel.Parent = UI.ContentContainer
+
+-- [[ HUD NOTIFICATION LAYOUT ENGINE ]]
+UI.NotifyContainer = Instance.new("Frame")
+UI.NotifyContainer.Name = "NotificationContainer"
+UI.NotifyContainer.Size = UDim2.new(0, 280, 0, 400)
+UI.NotifyContainer.Position = UDim2.new(1, -290, 0, 20)
+UI.NotifyContainer.BackgroundTransparency = 1
+UI.NotifyContainer.ZIndex = 9999
+UI.NotifyContainer.Parent = UI.ScreenGui
+
+local activeCards = {}
+local maxCards = 3
+
+function Decode:Notify(titleText, bodyText, isAlert)
+    for idx = #activeCards, 1, -1 do
+        local oldCard = activeCards[idx]
+        if idx >= maxCards then
+            table.remove(activeCards, idx)
+            local dropTween = TweenService:Create(oldCard, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+                Position = UDim2.new(1.5, 0, 0, oldCard.Position.Y.Offset),
+                BackgroundTransparency = 1
+            })
+            dropTween:Play()
+            dropTween.Completed:Connect(function() oldCard:Destroy() end)
+        else
+            activeCards[idx + 1] = oldCard
+            local targetY = idx * 68
+            TweenService:Create(oldCard, TweenInfo.new(0.2, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {
+                Position = UDim2.new(0, 0, 0, targetY)
+            }):Play()
+        end
+    end
+
+    local Card = Instance.new("Frame")
+    Card.Size = UDim2.new(1, 0, 0, 56)
+    Card.Position = UDim2.new(1.4, 0, 0, 0)
+    Card.BackgroundColor3 = Decode.Theme.SidebarBackground
+    Card.BackgroundTransparency = 0.1
+    Card.BorderSizePixel = 0
+    Card.ZIndex = 10000
+    Card.Parent = UI.NotifyContainer
+
+    local CardCorner = Instance.new("UICorner")
+    CardCorner.CornerRadius = UDim.new(0, 6)
+    CardCorner.Parent = Card
+
+    local GlowBar = Instance.new("Frame")
+    GlowBar.Size = UDim2.new(0, 4, 1, 0)
+    GlowBar.Position = UDim2.new(0, 0, 0, 0)
+    GlowBar.BackgroundColor3 = isAlert and Color3.fromRGB(239, 68, 68) or Decode.Theme.AccentColor
+    GlowBar.BorderSizePixel = 0
+    GlowBar.ZIndex = 10001
+    GlowBar.Parent = Card
+
+    local GlowCorner = Instance.new("UICorner")
+    GlowCorner.CornerRadius = UDim.new(0, 4)
+    GlowCorner.Parent = GlowBar
+
+    local TitleLabel = Instance.new("TextLabel")
+    TitleLabel.Size = UDim2.new(1, -20, 0, 20)
+    TitleLabel.Position = UDim2.new(0, 14, 0, 8)
+    TitleLabel.BackgroundTransparency = 1
+    TitleLabel.Text = tostring(titleText):upper()
+    TitleLabel.TextColor3 = isAlert and Color3.fromRGB(252, 165, 165) or Decode.Theme.TextMain
+    TitleLabel.TextSize = 11
+    TitleLabel.Font = Enum.Font.SourceSansBold
+    TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    TitleLabel.ZIndex = 10002
+    TitleLabel.Parent = Card
+
+    local BodyLabel = Instance.new("TextLabel")
+    BodyLabel.Size = UDim2.new(1, -20, 0, 24)
+    BodyLabel.Position = UDim2.new(0, 14, 0, 24)
+    BodyLabel.BackgroundTransparency = 1
+    BodyLabel.Text = bodyText
+    BodyLabel.TextColor3 = Decode.Theme.TextMuted
+    BodyLabel.TextSize = 13
+    BodyLabel.Font = Enum.Font.SourceSans
+    BodyLabel.TextXAlignment = Enum.TextXAlignment.Left
+    BodyLabel.TextWrapped = true
+    BodyLabel.ZIndex = 10002
+    BodyLabel.Parent = Card
+
+    table.insert(activeCards, 1, Card)
+
+    TweenService:Create(Card, TweenInfo.new(0.25, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {
+        Position = UDim2.new(0, 0, 0, 0)
+    }):Play()
+
+    task.delay(2.0, function()
+        if Card and Card.Parent then
+            local cardIndex = table.find(activeCards, Card)
+            if cardIndex then table.remove(activeCards, cardIndex) end
+            
+            local exitTween = TweenService:Create(Card, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+                Position = UDim2.new(1.4, 0, 0, Card.Position.Y.Offset),
+                BackgroundTransparency = 1
+            })
+            exitTween:Play()
+            exitTween.Completed:Connect(function() Card:Destroy() end)
+        end
+    end)
+end
+
+_G.PostMailboxTerminalAlert = function(title, body, isErr)
+    Decode:Notify(title, body, isErr)
+end
 
 function Decode:CreateTab(tabName)
     local Temp = {}
