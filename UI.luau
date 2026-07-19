@@ -1,3 +1,4 @@
+-- test
 local Decode = {}
 
 local CoreGui = game:GetService("CoreGui")
@@ -106,7 +107,7 @@ local Configurations = {
     EspPlotModeSelection = "",
     EspInventoryToggleState = false,
     EspObjectsToggleState = false,
-    FpsOptionSelection = "",
+    FpsOptionSelection = {},
     FpsBoostToggleState = false
 }
 
@@ -2007,11 +2008,15 @@ UI.FpsDrop = Decode:CreateDropdown(UI.CreatedPages["Misc"], "FPS")
 Decode:AddLabel(UI.FpsDrop, "- [ Options ] -")
 
 UI.FpsOptionSelector = Decode:AddSelector(UI.FpsDrop, "Select FPS option", {"Remove Other Plots", "Remove My Plot", "Hide All Plants", "Hide All Sprinklers", "Lowest Graphics"}, function(chosen, selectorObj)
-    if selectorObj.SelectBtn.Text == chosen then
-        Configurations.FpsOptionSelection = ""
-    else
-        Configurations.FpsOptionSelection = chosen
+    Configurations.FpsOptionSelection = Configurations.FpsOptionSelection or {}
+    local idx = table.find(Configurations.FpsOptionSelection, chosen)
+    
+    if idx then 
+        table.remove(Configurations.FpsOptionSelection, idx) 
+    else 
+        table.insert(Configurations.FpsOptionSelection, chosen) 
     end
+    
     saveConfig()
     selectorObj:UpdateSelectionText(Configurations.FpsOptionSelection)
 end)
@@ -2285,8 +2290,10 @@ task.spawn(function()
         UI.EspObjectsToggle.SliderNode.Position = UDim2.new(1, -14, 0.5, -6)
         UI.EspObjectsToggle.SliderNode.BackgroundColor3 = Decode.Theme.TextMain
     end
-
-    if Configurations.FpsOptionSelection and Configurations.FpsOptionSelection ~= "" then UI.FpsOptionSelector:UpdateSelectionText(Configurations.FpsOptionSelection) end
+    
+    if type(Configurations.FpsOptionSelection) == "table" then 
+        UI.FpsOptionSelector:UpdateSelectionText(Configurations.FpsOptionSelection) 
+    end
 
     if Configurations.FpsBoostToggleState and UI.FpsBoostToggle then
         UI.FpsBoostToggle.IsToggled = true
