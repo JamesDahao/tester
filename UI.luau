@@ -1,4 +1,3 @@
--- test
 local Decode = {}
 
 local CoreGui = game:GetService("CoreGui")
@@ -188,44 +187,50 @@ function Decode:RefreshTheme()
 end
 
 local function autoRegisterUI(instanceObject)
-    local mainColor = Color3.fromRGB(unpack(Configurations.MainHue))
-    local sidebarColor = Color3.fromRGB(unpack(Configurations.SidebarHue))
-    local accentColor = Color3.fromRGB(unpack(Configurations.AccentHue))
-    local elementColor = Color3.fromRGB(unpack(Configurations.ElementHue))
-    local textMainColor = Color3.fromRGB(unpack(Configurations.TextMainHue))
-    local textMutedColor = Color3.fromRGB(unpack(Configurations.TextMutedHue))
-
     local function scan(obj)
         if obj:IsA("UIStroke") then
-            if obj.Color == mainColor then Decode:RegisterObject(obj, "MainBackground")
-            elseif obj.Color == sidebarColor then Decode:RegisterObject(obj, "SidebarBackground")
-            elseif obj.Color == accentColor then Decode:RegisterObject(obj, "AccentColor")
-            elseif obj.Color == elementColor then Decode:RegisterObject(obj, "ElementBackground")
+            if obj.Name:find("Main") or obj.Name:find("Background") then Decode:RegisterObject(obj, "MainBackground")
+            elseif obj.Name:find("Sidebar") then Decode:RegisterObject(obj, "SidebarBackground")
+            elseif obj.Name:find("Accent") or obj.Name:find("Stroke") or obj.Name:find("Line") then Decode:RegisterObject(obj, "AccentColor")
+            else Decode:RegisterObject(obj, "ElementBackground")
             end
         elseif obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
-            if obj.TextColor3 == textMainColor then Decode:RegisterObject(obj, "TextMain")
-            elseif obj.TextColor3 == textMutedColor then Decode:RegisterObject(obj, "TextMuted")
+            if obj.Name:find("Muted") or obj.Name:find("Sub") then Decode:RegisterObject(obj, "TextMuted")
+            else Decode:RegisterObject(obj, "TextMain")
             end
-            if obj.BackgroundColor3 == mainColor then Decode:RegisterObject(obj, "MainBackground")
-            elseif obj.BackgroundColor3 == sidebarColor then Decode:RegisterObject(obj, "SidebarBackground")
-            elseif obj.BackgroundColor3 == accentColor then Decode:RegisterObject(obj, "AccentColor")
-            elseif obj.BackgroundColor3 == elementColor then Decode:RegisterObject(obj, "ElementBackground")
+            if obj.Name:find("Sidebar") then Decode:RegisterObject(obj, "SidebarBackground")
+            elseif obj.Name:find("Main") then Decode:RegisterObject(obj, "MainBackground")
+            elseif obj.Name:find("Box") or obj.Name:find("Btn") or obj.Name:find("Frame") then Decode:RegisterObject(obj, "ElementBackground")
             end
         elseif obj:IsA("GuiObject") then
-            if obj.BackgroundColor3 == mainColor then Decode:RegisterObject(obj, "MainBackground")
-            elseif obj.BackgroundColor3 == sidebarColor then Decode:RegisterObject(obj, "SidebarBackground")
-            elseif obj.BackgroundColor3 == accentColor then Decode:RegisterObject(obj, "AccentColor")
-            elseif obj.BackgroundColor3 == elementColor then Decode:RegisterObject(obj, "ElementBackground")
+            if obj.Name:find("Sidebar") then Decode:RegisterObject(obj, "SidebarBackground")
+            elseif obj.Name:find("Main") then Decode:RegisterObject(obj, "MainBackground")
+            elseif obj.Name:find("Accent") then Decode:RegisterObject(obj, "AccentColor")
+            else Decode:RegisterObject(obj, "ElementBackground")
             end
         end
-        
         local children = obj:GetChildren()
-        for i = 1, #children do
-            scan(children[i])
-        end
+        for i = 1, #children do scan(children[i]) end
     end
-
     scan(instanceObject)
+end
+
+local function numToRgbTable(num)
+    if not num then return {255, 255, 255} end
+    local r = math.floor(num / 65536) % 256
+    local g = math.floor(num / 256) % 256
+    local b = num % 256
+    return {r, g, b}
+end
+
+local function rgbTableToHexStr(rgbTable)
+    if type(rgbTable) ~= "table" or #rgbTable ~= 3 then return "0xFFFFFF" end
+    return string.format("0x%02X%02X%02X", rgbTable[1], rgbTable[2], rgbTable[3])
+end
+
+local function rgbTableToHexNum(rgbTable)
+    if type(rgbTable) ~= "table" or #rgbTable ~= 3 then return 0xFFFFFF end
+    return (rgbTable[1] * 65536) + (rgbTable[2] * 256) + rgbTable[3]
 end
 
 local function saveConfig()
@@ -267,6 +272,26 @@ end
 
 loadConfig()
 _G.DecodeAPI = { Configs = Configurations }
+
+local function handleSliderHexInput(themeKey, numericValue, sliderObject)
+    local rgbTable = numToRgbTable(numericValue)
+    if themeKey == "MainBackground" then Configurations.MainHue = rgbTable
+    elseif themeKey == "SidebarBackground" then Configurations.SidebarHue = rgbTable
+    elseif themeKey == "AccentColor" then Configurations.AccentHue = rgbTable
+    elseif themeKey == "ElementBackground" then Configurations.ElementHue = rgbTable
+    elseif themeKey == "TextMain" then Configurations.TextMainHue = rgbTable
+    elseif themeKey == "TextMuted" then Configurations.TextMutedHue = rgbTable
+    end
+    if saveConfig then saveConfig() end
+    
+    Decode.ThemeRegistry = {MainBackground = {}, SidebarBackground = {}, AccentColor = {}, ElementBackground = {}, TextMain = {}, TextMuted = {}}
+    if UI and UI.ScreenGui then autoRegisterUI(UI.ScreenGui) end
+    Decode:RefreshTheme()
+    
+    if sliderObject and sliderObject.ValueBox then
+        sliderObject.ValueBox.Text = string.format("0x%02X%02X%02X", rgbTable[1], rgbTable[2], rgbTable[3])
+    end
+end
 
 if not isfolder(folderPath) then makefolder(folderPath) end
 if not isfolder(assetFolder) then makefolder(assetFolder) end
@@ -2128,36 +2153,6 @@ UI.FpsBoostToggle = Decode:AddToggle(UI.FpsDrop, "FPS Boost", function(state)
     Configurations.FpsBoostToggleState = state
     saveConfig()
 end)
-
-local function numToRgbTable(num)
-    if not num then return {255, 255, 255} end
-    local r = math.floor(num / 65536) % 256
-    local g = math.floor(num / 256) % 256
-    local b = num % 256
-    return {r, g, b}
-end
-
-local function handleSliderHexInput(themeKey, numericValue, sliderObject)
-    local rgbTable = numToRgbTable(numericValue)
-    if themeKey == "MainBackground" then Configurations.MainHue = rgbTable
-    elseif themeKey == "SidebarBackground" then Configurations.SidebarHue = rgbTable
-    elseif themeKey == "AccentColor" then Configurations.AccentHue = rgbTable
-    elseif themeKey == "ElementBackground" then Configurations.ElementHue = rgbTable
-    elseif themeKey == "TextMain" then Configurations.TextMainHue = rgbTable
-    elseif themeKey == "TextMuted" then Configurations.TextMutedHue = rgbTable
-    end
-    saveConfig()
-    Decode:RefreshTheme()
-    
-    if sliderObject and sliderObject.ValueBox then
-        sliderObject.ValueBox.Text = string.format("0x%02X%02X%02X", rgbTable[1], rgbTable[2], rgbTable[3])
-    end
-end
-
-local function rgbTableToHexStr(rgbTable)
-    if type(rgbTable) ~= "table" or #rgbTable ~= 3 then return "0xFFFFFF" end
-    return string.format("0x%02X%02X%02X", rgbTable[1], rgbTable[2], rgbTable[3])
-end
 
 UI.ThemeDrop = Decode:CreateDropdown(UI.CreatedPages["Settings"], "Theme")
 
