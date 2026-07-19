@@ -1,4 +1,3 @@
--- 1
 local Decode = {}
 
 local CoreGui = game:GetService("CoreGui")
@@ -106,7 +105,9 @@ local Configurations = {
     EspSprinklersFilter = {},
     EspPlotModeSelection = "",
     EspInventoryToggleState = false,
-    EspObjectsToggleState = false
+    EspObjectsToggleState = false,
+    FpsOptionSelection = "",
+    FpsBoostToggleState = false
 }
 
 local UI = {
@@ -416,7 +417,6 @@ UI.PageHeaderLabel.Font = Enum.Font.SourceSansBold
 UI.PageHeaderLabel.TextXAlignment = Enum.TextXAlignment.Left
 UI.PageHeaderLabel.Parent = UI.ContentContainer
 
--- [[ HUD NOTIFICATION LAYOUT ENGINE ]]
 UI.NotifyContainer = Instance.new("Frame")
 UI.NotifyContainer.Name = "NotificationContainer"
 UI.NotifyContainer.Size = UDim2.new(0, 280, 0, 400)
@@ -2002,6 +2002,27 @@ UI.EspObjectsToggle = Decode:AddToggle(UI.EspDrop, "ESP Fruits/Sprinklers", func
     saveConfig()
 end)
 
+UI.FpsDrop = Decode:CreateDropdown(UI.CreatedPages["Misc"], "FPS")
+
+Decode:AddLabel(UI.FpsDrop, "- [ Options ] -")
+
+UI.FpsOptionSelector = Decode:AddSelector(UI.FpsDrop, "Select FPS option", {"Remove Other Plots", "Remove My Plot", "Hide All Plants", "Hide All Sprinklers", "Lowest Graphics"}, function(chosen, selectorObj)
+    if selectorObj.SelectBtn.Text == chosen then
+        Configurations.FpsOptionSelection = ""
+    else
+        Configurations.FpsOptionSelection = chosen
+    end
+    saveConfig()
+    selectorObj:UpdateSelectionText(Configurations.FpsOptionSelection)
+end)
+
+Decode:AddLabel(UI.FpsDrop, "- [ Function ] -")
+
+UI.FpsBoostToggle = Decode:AddToggle(UI.FpsDrop, "FPS Boost", function(state)
+    Configurations.FpsBoostToggleState = state
+    saveConfig()
+end)
+
 task.spawn(function()
     task.wait(0.1)
 
@@ -2263,6 +2284,15 @@ task.spawn(function()
         UI.EspObjectsToggle.SwitchBg.BackgroundColor3 = Decode.Theme.AccentColor
         UI.EspObjectsToggle.SliderNode.Position = UDim2.new(1, -14, 0.5, -6)
         UI.EspObjectsToggle.SliderNode.BackgroundColor3 = Decode.Theme.TextMain
+    end
+
+    if Configurations.FpsOptionSelection and Configurations.FpsOptionSelection ~= "" then UI.FpsOptionSelector:UpdateSelectionText(Configurations.FpsOptionSelection) end
+
+    if Configurations.FpsBoostToggleState and UI.FpsBoostToggle then
+        UI.FpsBoostToggle.IsToggled = true
+        UI.FpsBoostToggle.SwitchBg.BackgroundColor3 = Decode.Theme.AccentColor
+        UI.FpsBoostToggle.SliderNode.Position = UDim2.new(1, -14, 0.5, -6)
+        UI.FpsBoostToggle.SliderNode.BackgroundColor3 = Decode.Theme.TextMain
     end
 end)
 
