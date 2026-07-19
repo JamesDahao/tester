@@ -1,4 +1,3 @@
---Test 1
 local Decode = {}
 
 local CoreGui = game:GetService("CoreGui")
@@ -95,7 +94,12 @@ local Configurations = {
     TrowelInterval = 0,
     TrowelPlantsFilter = {},
     TrowelSavedCFrame = nil,
-    AutoTrowelToggleState = false
+    AutoTrowelToggleState = false,
+    DropTweenSpeed = 0,
+    DropFruitsFilter = {},
+    DropPetsFilter = {},
+    AutoDropItemsEnabled = false,
+    CollectDroppedItemsEnabled = false
 }
 
 local UI = {
@@ -1159,7 +1163,7 @@ end)
 
 Decode:AddLabel(UI.HarvestDrop, "- [ Options ] -")
 
-UI.FruitSelector = Decode:AddSelector(UI.HarvestDrop, "Select Fruit", Decode:GetAssetCategory("Plants"), function(chosen, selectorObj)
+UI.FruitSelector = Decode:AddSelector(UI.HarvestDrop, "Select Fruits", Decode:GetAssetCategory("Plants"), function(chosen, selectorObj)
     Configurations.HarvestFruitFilter = Configurations.HarvestFruitFilter or {}
     local idx = table.find(Configurations.HarvestFruitFilter, chosen)
     if idx then table.remove(Configurations.HarvestFruitFilter, idx) else table.insert(Configurations.HarvestFruitFilter, chosen) end
@@ -1167,7 +1171,7 @@ UI.FruitSelector = Decode:AddSelector(UI.HarvestDrop, "Select Fruit", Decode:Get
     selectorObj:UpdateSelectionText(Configurations.HarvestFruitFilter)
 end)
 
-UI.MutationSelector = Decode:AddSelector(UI.HarvestDrop, "Select Mutation", Decode:GetGameMutations(), function(chosen, selectorObj)
+UI.MutationSelector = Decode:AddSelector(UI.HarvestDrop, "Select Mutations", Decode:GetGameMutations(), function(chosen, selectorObj)
     Configurations.HarvestMutationFilter = Configurations.HarvestMutationFilter or {}
     local idx = table.find(Configurations.HarvestMutationFilter, chosen)
     if idx then table.remove(Configurations.HarvestMutationFilter, idx) else table.insert(Configurations.HarvestMutationFilter, chosen) end
@@ -1239,7 +1243,7 @@ end)
 
 Decode:AddLabel(UI.SellDrop, "- [ Options ] -")
 
-UI.SellFruitSelector = Decode:AddSelector(UI.SellDrop, "Select Fruit", Decode:GetAssetCategory("Plants"), function(chosen, selectorObj)
+UI.SellFruitSelector = Decode:AddSelector(UI.SellDrop, "Select Fruits", Decode:GetAssetCategory("Plants"), function(chosen, selectorObj)
     Configurations.SellFruitFilter = Configurations.SellFruitFilter or {}
     local idx = table.find(Configurations.SellFruitFilter, chosen)
     if idx then 
@@ -1251,7 +1255,7 @@ UI.SellFruitSelector = Decode:AddSelector(UI.SellDrop, "Select Fruit", Decode:Ge
     selectorObj:UpdateSelectionText(Configurations.SellFruitFilter)
 end)
 
-UI.SellMutationSelector = Decode:AddSelector(UI.SellDrop, "Select Mutation", Decode:GetGameMutations(), function(chosen, selectorObj)
+UI.SellMutationSelector = Decode:AddSelector(UI.SellDrop, "Select Mutations", Decode:GetGameMutations(), function(chosen, selectorObj)
     Configurations.SellMutationFilter = Configurations.SellMutationFilter or {}
     local idx = table.find(Configurations.SellMutationFilter, chosen)
     if idx then 
@@ -1771,6 +1775,45 @@ UI.BuyAuctionToggle = Decode:AddToggle(UI.AuctionDrop, "Buy Items", function(sta
     saveConfig()
 end)
 
+UI.DropDrop = Decode:CreateDropdown(UI.CreatedPages["Assist"], "Drop")
+
+Decode:AddLabel(UI.DropDrop, "- [ Configs ] -")
+
+UI.DropTweenSpeedSlider = Decode:AddSlider(UI.DropDrop, "Tween Speed", Configurations.DropTweenSpeed or 0, function(value)
+    Configurations.DropTweenSpeed = value
+    saveConfig()
+end)
+
+Decode:AddLabel(UI.DropDrop, "- [ Options ] -")
+
+UI.DropFruitsSelector = Decode:AddSelector(UI.DropDrop, "Select Fruits", {}, function(chosen, selectorObj)
+    Configurations.DropFruitsFilter = Configurations.DropFruitsFilter or {}
+    local idx = table.find(Configurations.DropFruitsFilter, chosen)
+    if idx then table.remove(Configurations.DropFruitsFilter, idx) else table.insert(Configurations.DropFruitsFilter, chosen) end
+    saveConfig()
+    selectorObj:UpdateSelectionText(Configurations.DropFruitsFilter)
+end)
+
+UI.DropPetsSelector = Decode:AddSelector(UI.DropDrop, "Select Pets", {}, function(chosen, selectorObj)
+    Configurations.DropPetsFilter = Configurations.DropPetsFilter or {}
+    local idx = table.find(Configurations.DropPetsFilter, chosen)
+    if idx then table.remove(Configurations.DropPetsFilter, idx) else table.insert(Configurations.DropPetsFilter, chosen) end
+    saveConfig()
+    selectorObj:UpdateSelectionText(Configurations.DropPetsFilter)
+end)
+
+Decode:AddLabel(UI.DropDrop, "- [ Functions ] -")
+
+UI.DropActionToggle = Decode:AddToggle(UI.DropDrop, "Drop Item", function(state)
+    Configurations.AutoDropItemsEnabled = state
+    saveConfig()
+end)
+
+UI.CollectDroppedToggle = Decode:AddToggle(UI.DropDrop, "Collect Dropped Items", function(state)
+    Configurations.CollectDroppedItemsEnabled = state
+    saveConfig()
+end)
+
 UI.ShopSeedsDrop = Decode:CreateDropdown(UI.CreatedPages["Shop"], "Seeds")
 Decode:AddLabel(UI.ShopSeedsDrop, "- [ Options ] -")
 
@@ -2131,6 +2174,22 @@ task.spawn(function()
         UI.TrowelActionToggle.SliderNode.Position = UDim2.new(1, -14, 0.5, -6)
         UI.TrowelActionToggle.SliderNode.BackgroundColor3 = Decode.Theme.TextMain
     end
+
+    if Configurations.DropFruitsFilter then UI.DropFruitsSelector:UpdateSelectionText(Configurations.DropFruitsFilter) end
+    if Configurations.DropPetsFilter then UI.DropPetsSelector:UpdateSelectionText(Configurations.DropPetsFilter) end
+
+    if Configurations.AutoDropItemsEnabled and UI.DropActionToggle then
+        UI.DropActionToggle.IsToggled = true
+        UI.DropActionToggle.SwitchBg.BackgroundColor3 = Decode.Theme.AccentColor
+        UI.DropActionToggle.SliderNode.Position = UDim2.new(1, -14, 0.5, -6)
+        UI.DropActionToggle.SliderNode.BackgroundColor3 = Decode.Theme.TextMain
+    end
+    if Configurations.CollectDroppedItemsEnabled and UI.CollectDroppedToggle then
+        UI.CollectDroppedToggle.IsToggled = true
+        UI.CollectDroppedToggle.SwitchBg.BackgroundColor3 = Decode.Theme.AccentColor
+        UI.CollectDroppedToggle.SliderNode.Position = UDim2.new(1, -14, 0.5, -6)
+        UI.CollectDroppedToggle.SliderNode.BackgroundColor3 = Decode.Theme.TextMain
+    end
 end)
 
 task.spawn(function()
@@ -2167,6 +2226,9 @@ task.spawn(function()
 
     if UI.PotPlantsSelector and UI.PotPlantsSelector.Populate then pcall(function() UI.PotPlantsSelector:Populate(FruitList) end) end
     if UI.TrowelPlantsSelector and UI.TrowelPlantsSelector.Populate then pcall(function() UI.TrowelPlantsSelector:Populate(FruitList) end) end
+
+    if UI.DropFruitsSelector and UI.DropFruitsSelector.Populate then pcall(function() UI.DropFruitsSelector:Populate(FruitList) end) end
+    if UI.DropPetsSelector and UI.DropPetsSelector.Populate then pcall(function() UI.DropPetsSelector:Populate(PetList) end) end
 
     if UI.AuctionEggsSelector and UI.AuctionEggsSelector.Populate then pcall(function() UI.AuctionEggsSelector:Populate(EggsList) end) end
     if UI.AuctionSprinklersSelector and UI.AuctionSprinklersSelector.Populate then pcall(function() UI.AuctionSprinklersSelector:Populate(SprinklersList) end) end
