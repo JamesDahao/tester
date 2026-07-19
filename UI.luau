@@ -1,3 +1,4 @@
+-- test
 local Decode = {}
 
 local CoreGui = game:GetService("CoreGui")
@@ -2129,7 +2130,7 @@ UI.FpsBoostToggle = Decode:AddToggle(UI.FpsDrop, "FPS Boost", function(state)
 end)
 
 local function hexToColor3(hex)
-    hex = hex:gsub("#", "")
+    hex = hex:gsub("%s+", ""):gsub("#", "")
     if #hex ~= 6 then return nil end
     local r = tonumber(hex:sub(1, 2), 16)
     local g = tonumber(hex:sub(3, 4), 16)
@@ -2141,6 +2142,12 @@ local function hexToColor3(hex)
 end
 
 local function handleHexInput(themeKey, hexString, selectorObj)
+    if not hexString or hexString == "" then return end
+    
+    if not hexString:find("^#") and #hexString == 6 then
+        hexString = "#" .. hexString
+    end
+    
     local newColor = hexToColor3(hexString)
     if newColor then
         local rgbTable = {math.floor(newColor.R * 255), math.floor(newColor.G * 255), math.floor(newColor.B * 255)}
@@ -2154,42 +2161,40 @@ local function handleHexInput(themeKey, hexString, selectorObj)
         saveConfig()
         Decode:RefreshTheme()
         if selectorObj and selectorObj.UpdateSelectionText then
-            selectorObj:UpdateSelectionText(hexString)
+            selectorObj:UpdateSelectionText(hexString:upper())
         end
     end
 end
 
 UI.ThemeDrop = Decode:CreateDropdown(UI.CreatedPages["Settings"], "Theme")
 
-local presetHexes = {"#0A121E", "#0F1B2C", "#0EA5E9", "#16263E", "#FFFFFF", "#8CA0B9", "#FF0000", "#00FF00", "#0000FF"}
-
 Decode:AddLabel(UI.ThemeDrop, "- [ Main Color ] -")
-UI.MainColorHex = Decode:AddSelector(UI.ThemeDrop, "Paste Hex (#0A121E)", presetHexes, function(chosen, selectorObj)
+UI.MainColorHex = Decode:AddSelector(UI.ThemeDrop, "Type Hex (e.g. 0A121E)", {}, function(chosen, selectorObj)
     handleHexInput("MainBackground", chosen, selectorObj)
 end)
 
 Decode:AddLabel(UI.ThemeDrop, "- [ Side Bar Color ] -")
-UI.SidebarColorHex = Decode:AddSelector(UI.ThemeDrop, "Paste Hex (#151B2C)", presetHexes, function(chosen, selectorObj)
+UI.SidebarColorHex = Decode:AddSelector(UI.ThemeDrop, "Type Hex (e.g. 151B2C)", {}, function(chosen, selectorObj)
     handleHexInput("SidebarBackground", chosen, selectorObj)
 end)
 
 Decode:AddLabel(UI.ThemeDrop, "- [ Accent Color ] -")
-UI.AccentColorHex = Decode:AddSelector(UI.ThemeDrop, "Paste Hex (#0EA5E9)", presetHexes, function(chosen, selectorObj)
+UI.AccentColorHex = Decode:AddSelector(UI.ThemeDrop, "Type Hex (e.g. 0EA5E9)", {}, function(chosen, selectorObj)
     handleHexInput("AccentColor", chosen, selectorObj)
 end)
 
 Decode:AddLabel(UI.ThemeDrop, "- [ Element Color ] -")
-UI.ElementColorHex = Decode:AddSelector(UI.ThemeDrop, "Paste Hex (#16263E)", presetHexes, function(chosen, selectorObj)
+UI.ElementColorHex = Decode:AddSelector(UI.ThemeDrop, "Type Hex (e.g. 16263E)", {}, function(chosen, selectorObj)
     handleHexInput("ElementBackground", chosen, selectorObj)
 end)
 
 Decode:AddLabel(UI.ThemeDrop, "- [ Main Text Color ] -")
-UI.MainTextColorHex = Decode:AddSelector(UI.ThemeDrop, "Paste Hex (#FFFFFF)", presetHexes, function(chosen, selectorObj)
+UI.MainTextColorHex = Decode:AddSelector(UI.ThemeDrop, "Type Hex (e.g. FFFFFF)", {}, function(chosen, selectorObj)
     handleHexInput("TextMain", chosen, selectorObj)
 end)
 
 Decode:AddLabel(UI.ThemeDrop, "- [ Muted Text Color ] -")
-UI.MutedTextColorHex = Decode:AddSelector(UI.ThemeDrop, "Paste Hex (#8CA0B9)", presetHexes, function(chosen, selectorObj)
+UI.MutedTextColorHex = Decode:AddSelector(UI.ThemeDrop, "Type Hex (e.g. 8CA0B9)", {}, function(chosen, selectorObj)
     handleHexInput("TextMuted", chosen, selectorObj)
 end)
 
