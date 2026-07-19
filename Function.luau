@@ -1,3 +1,4 @@
+-- 1
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
@@ -7,6 +8,8 @@ local LocalPlayer = Players.LocalPlayer
 local cachedGardenSyncController = nil
 local currentLockedTarget = nil
 local currentLockedPrompt = nil
+local GardenSync = nil
+local SprinklerData = {}
 
 task.spawn(function()
     local playerScripts = LocalPlayer:WaitForChild("PlayerScripts", 10)
@@ -2066,6 +2069,313 @@ task.spawn(function()
         else
             currentLockedTarget = nil
             task.wait(1.0)
+        end
+    end
+end)
+
+pcall(function()
+    local controllerInstance = LocalPlayer:FindFirstChild("PlayerScripts")
+    controllerInstance = controllerInstance and controllerInstance:FindFirstChild("Controllers")
+    controllerInstance = controllerInstance and controllerInstance:FindFirstChild("GardenSyncController")
+    
+    if controllerInstance and controllerInstance:IsA("ModuleScript") then
+        GardenSync = require(controllerInstance)
+    end
+end)
+
+pcall(function()
+    local sharedFolder = game:GetService("ReplicatedStorage"):FindFirstChild("SharedModules")
+    local sprinklerMod = sharedFolder and sharedFolder:FindFirstChild("SprinklerData")
+    
+    if sprinklerMod and sprinklerMod:IsA("ModuleScript") then
+        SprinklerData = require(sprinklerMod)
+    end
+end)
+
+local sprinklerInfo = {}
+for _, info in ipairs(SprinklerData) do
+    if type(info) == "table" and info.SprinklerName then
+        sprinklerInfo[info.SprinklerName] = info
+    end
+end
+
+local function formatTime(sec)
+    sec = math.max(0, math.floor(sec))
+    if sec <= 0 then return "0s" end
+
+    local yrs = math.floor(sec / 31536000)
+    sec = sec % 31536000
+    local mos = math.floor(sec / 2592000)
+    sec = sec % 2592000
+    local days = math.floor(sec / 86400)
+    sec = sec % 86400
+    local hrs = math.floor(sec / 3600)
+    sec = sec % 3600
+    local mins = math.floor(sec / 60)
+    local secs = sec % 60
+
+    local output = {}
+    if yrs > 0 then table.insert(output, yrs .. "yrs") end
+    if mos > 0 then table.insert(output, mos .. "months") end
+    if days > 0 then table.insert(output, days .. "days") end
+    if hrs > 0 then table.insert(output, hrs .. "h") end
+    if mins > 0 then table.insert(output, mins .. "m") end
+    if secs > 0 or #output == 0 then table.insert(output, secs .. "s") end
+
+    return table.concat(output, " ")
+end
+
+local function getBillboard(model, guiName, textColor)
+    local part = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
+    if not part then return nil end
+
+    local gui = part:FindFirstChild(guiName)
+    if gui then 
+        if textColor then gui.Timer.TextColor3 = textColor end
+        return gui 
+    end
+
+    gui = Instance.new("BillboardGui")
+    gui.Name = guiName
+    gui.Size = UDim2.fromOffset(200, 36)
+    gui.StudsOffset = Vector3.new(0, 3.5, 0)
+    gui.AlwaysOnTop = true
+    gui.MaxDistance = 250
+    gui.Parent = part
+
+    local label = Instance.new("TextLabel")
+    label.Name = "Timer"
+    label.Size = UDim2.fromScale(1, 1)
+    label.BackgroundTransparency = 1
+    label.TextScaled = false
+    label.TextSize = 20
+    label.Font = Enum.Font.SourceSans
+    label.TextStrokeTransparency = 0.3
+    label.TextStrokeColor3 = Color3.new(0,0,0)
+    label.TextColor3 = textColor or Color3.fromRGB(0, 165, 255)
+    label.Parent = gui
+
+    return gui
+end
+
+local function checkIsWhitelisted(category, itemName, currentMutation)
+    if not itemName or itemName == "" then return false end
+    local Configs = _G.DecodeAPI and _G.DecodeAPI.Configs
+    if not Configs then return false end
+    
+    if category == "Plants" and Configs.EspFruitsFilter then
+        if table.find(Configs.EspFruitsFilter, tostring(itemName)) then return true end
+    elseif category == "Sprinklers" and Configs.EspSprinklersFilter then
+        if table.find(Configs.EspSprinklersFilter, tostring(itemName)) then return true end
+    end
+    
+    return false
+end
+
+local function getESPCropWeightKg(instanceObject)
+    local plantModules = ReplicatedStorage:FindFirstChild("PlantGenerationModules")
+    if not plantModules then return 0 end
+    local kg = 0
+
+    pcall(function()
+        if instanceObject:GetAttribute("CorePartName") then
+            local fruitName = instanceObject:GetAttribute("CorePartName") or instanceObject.Name
+            local fruitFolder = plantModules:FindFirstChild("Fruits")
+            local module = fruitFolder and fruitFolder:FindFirstChild(fruitName)
+            if not module then return end
+            
+            local data = require(module)
+            local baseWeight = data.GrowData and data.GrowData.BaseWeight or 0
+            local sizeMulti = instanceObject:GetAttribute("SizeMulti") or 1
+            local overtimeGrowth = instanceObject:GetAttribute("OvertimeGrowth") or instanceObject:GetAttribute("GrowRateMulti") or 1
+            kg = baseWeight * sizeMulti * overtimeGrowth
+            return
+        end
+        
+        local seedName = instanceObject:GetAttribute("SeedName") or instanceObject:GetAttribute("CorePartName") or instanceObject.Name
+        local plantFolder = plantModules:FindFirstChild("Plants")
+        local module = plantFolder and plantFolder:FindFirstChild(seedName)
+        if not module then return end
+        
+        local data = require(module)
+        local baseWeight = data.GrowData and data.GrowData.BaseWeight
+        if not baseWeight then return end
+        
+        local sizeMultiplier = 1
+        local overtimeGrowth = 1
+        local userId = tonumber(instanceObject:GetAttribute("UserId"))
+        local plantId = instanceObject:GetAttribute("PlantId")
+        
+        if not userId or not plantId then
+            local split = string.split(instanceObject.Name, "_")
+            if #split >= 2 then
+                userId = tonumber(split[1])
+                plantId = split[2]
+            end
+        end
+        
+        if userId and plantId and GardenSync then
+            pcall(function()
+                local plantData = GardenSync:GetPlant(userId, tostring(plantId))
+                if plantData then
+                    sizeMultiplier = plantData.SizeMultiplier or 1
+                    overtimeGrowth = plantData.OvertimeGrowth or 1
+                end
+            end)
+        end
+        kg = baseWeight * sizeMultiplier * overtimeGrowth
+    end)
+    return kg
+end
+
+task.spawn(function()
+    while true do
+        task.wait(1)
+        local Configs = _G.DecodeAPI and _G.DecodeAPI.Configs
+
+        if not Configs or not Configs.EspObjectsToggleState then
+            local gardensFolder = workspace:FindFirstChild("Gardens")
+            if gardensFolder then
+                for _, plot in ipairs(gardensFolder:GetChildren()) do
+                    local folder = plot:FindFirstChild("Sprinklers")
+                    if folder then
+                        for _, model in ipairs(folder:GetChildren()) do
+                            local part = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
+                            local gui = part and part:FindFirstChild("DebugSprinklerTimer") or model:FindFirstChild("DebugSprinklerTimer")
+                            if gui then gui:Destroy() end
+                        end
+                    end
+                    local plantsFolder = plot:FindFirstChild("Plants")
+                    if plantsFolder then
+                        for _, plantModel in ipairs(plantsFolder:GetChildren()) do
+                            local part = plantModel.PrimaryPart or plantModel:FindFirstChildWhichIsA("BasePart")
+                            local gui = part and part:FindFirstChild("DebugPlantFruitESP") or plantModel:FindFirstChild("DebugPlantFruitESP")
+                            if gui then gui:Destroy() end
+                            local subFruits = plantModel:FindFirstChild("Fruits")
+                            if subFruits then
+                                for _, fruitModel in ipairs(subFruits:GetChildren()) do
+                                    local fPart = fruitModel.PrimaryPart or fruitModel:FindFirstChildWhichIsA("BasePart")
+                                    local fGui = fPart and fPart:FindFirstChild("DebugPlantFruitESP") or fruitModel:FindFirstChild("DebugPlantFruitESP")
+                                    if fGui then fGui:Destroy() end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+            continue
+        end
+
+        local rawMode = tostring(Configs.EspPlotModeSelection or ""):upper()
+        local targetMode = (rawMode == "OWN PLOT" or rawMode == "OWN PLOTS") and "OWN PLOTS" or "ALL PLOTS"
+        local minWeightThreshold = tonumber(Configs.EspAboveWeightValue) or 0
+        local ownPlotId = LocalPlayer:GetAttribute("PlotId")
+        local ownPlotName = ownPlotId and ("Plot" .. tostring(ownPlotId)) or nil
+
+        local gardensFolder = workspace:FindFirstChild("Gardens")
+        if not gardensFolder then continue end
+
+        local syncedData = {}
+        pcall(function()
+            if GardenSync and LocalPlayer then
+                syncedData[tostring(LocalPlayer.UserId)] = GardenSync:GetSprinklers(LocalPlayer.UserId)
+                if targetMode == "ALL PLOTS" then
+                    for _, p in ipairs(Players:GetPlayers()) do
+                        if p then
+                            syncedData[tostring(p.UserId)] = GardenSync:GetSprinklers(p.UserId)
+                        end
+                    end
+                end
+            end
+        end)
+
+        for _, plot in ipairs(gardensFolder:GetChildren()) do
+            if plot.Name:sub(1, 4) == "Plot" then
+                local isAllowedTarget = false
+                if targetMode == "ALL PLOTS" then
+                    isAllowedTarget = true
+                elseif targetMode == "OWN PLOTS" and ownPlotName and plot.Name == ownPlotName then
+                    isAllowedTarget = true
+                end
+
+                local folder = plot:FindFirstChild("Sprinklers")
+                if folder then
+                    for _, model in ipairs(folder:GetChildren()) do
+                        local sName = model:GetAttribute("SprinklerName") or ""
+                        local sUid = tostring(model:GetAttribute("UserId") or "")
+                        
+                        local splitName = string.split(model.Name, "_")
+                        if sUid == "" and #splitName >= 2 then sUid = tostring(splitName[1]) end
+                        local sId = splitName[2] or model.Name
+
+                        local isWhitelisted = checkIsWhitelisted("Sprinklers", sName, nil)
+
+                        if isAllowedTarget and isWhitelisted then
+                            local remaining = 0
+                            local pData = syncedData[sUid]
+                            if pData and pData[sId] then
+                                local cfg = sprinklerInfo[sName]
+                                if cfg and cfg.Lifetime then
+                                    remaining = math.max(0, cfg.Lifetime - (os.time() - pData[sId].PlacedAt))
+                                end
+                            end
+
+                            local gui = getBillboard(model, "DebugSprinklerTimer", Color3.fromRGB(255, 20, 147))
+                            if gui then
+                                gui.Enabled = true
+                                gui.Timer.Text = sName .. " | " .. formatTime(remaining)
+                            end
+                        else
+                            local part = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
+                            local gui = part and part:FindFirstChild("DebugSprinklerTimer") or model:FindFirstChild("DebugSprinklerTimer")
+                            if gui then gui:Destroy() end
+                        end
+                    end
+                end
+
+                local plantsFolder = plot:FindFirstChild("Plants")
+                if plantsFolder then
+                    for _, plantModel in ipairs(plantsFolder:GetChildren()) do
+                        local seedName = plantModel:GetAttribute("SeedName") or plantModel:GetAttribute("CorePartName") or plantModel.Name
+                        local mutation = plantModel:GetAttribute("Mutation") or "None"
+                        local fruitsSubFolder = plantModel:FindFirstChild("Fruits")
+                        
+                        local isWhitelisted = checkIsWhitelisted("Plants", seedName, mutation)
+                        local fruitsChildren = fruitsSubFolder and fruitsSubFolder:GetChildren()
+                        local hasFruits = fruitsChildren and #fruitsChildren > 0
+
+                        if isAllowedTarget and (isWhitelisted or hasFruits) then
+                            local weight = getESPCropWeightKg(plantModel)
+
+                            if weight >= minWeightThreshold and weight > 0.05 then
+                                local gui = getBillboard(plantModel, "DebugPlantFruitESP", Color3.fromRGB(255, 215, 0))
+                                if gui then
+                                    gui.Enabled = true
+                                    local displayMut = (mutation ~= "None" and mutation ~= "") and (" [" .. mutation .. "]") or ""
+                                    gui.Timer.Text = string.format("%s%s\n%.2f kg", seedName, displayMut, weight)
+                                end
+                            else
+                                local part = plantModel.PrimaryPart or plantModel:FindFirstChildWhichIsA("BasePart")
+                                local gui = part and part:FindFirstChild("DebugPlantFruitESP") or plantModel:FindFirstChild("DebugPlantFruitESP")
+                                if gui then gui:Destroy() end
+                            end
+                        else
+                            local part = plantModel.PrimaryPart or plantModel:FindFirstChildWhichIsA("BasePart")
+                            local gui = part and part:FindFirstChild("DebugPlantFruitESP") or plantModel:FindFirstChild("DebugPlantFruitESP")
+                            if gui then gui:Destroy() end
+
+                            if fruitsSubFolder then
+                                for _, fruitModel in ipairs(fruitsSubFolder:GetChildren()) do
+                                    local fPart = fruitModel.PrimaryPart or fruitModel:FindFirstChildWhichIsA("BasePart")
+                                    local fGui = fPart and fPart:FindFirstChild("DebugPlantFruitESP") or fruitModel:FindFirstChild("DebugPlantFruitESP")
+                                    if fGui then fGui:Destroy() end
+                                end
+                            end
+                        end
+                    end
+                end
+
+            end
         end
     end
 end)
