@@ -1,4 +1,3 @@
--- 2
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
@@ -8,8 +7,6 @@ local LocalPlayer = Players.LocalPlayer
 local cachedGardenSyncController = nil
 local currentLockedTarget = nil
 local currentLockedPrompt = nil
-local GardenSync = nil
-local SprinklerData = {}
 
 task.spawn(function()
     local playerScripts = LocalPlayer:WaitForChild("PlayerScripts", 10)
@@ -2073,26 +2070,14 @@ task.spawn(function()
     end
 end)
 
-pcall(function()
-    local localPlayer = game:GetService("Players").LocalPlayer
-    local pScripts = localPlayer:WaitForChild("PlayerScripts", 5)
-    local controllers = pScripts:WaitForChild("Controllers", 5)
-    local targetController = controllers:WaitForChild("GardenSyncController", 5)
-    if targetController and targetController:IsA("ModuleScript") then
-        local requireExecutor = _G.require or require
-        GardenSync = requireExecutor(targetController)
-    end
-end)
+local PlayerScripts = LocalPlayer:WaitForChild("PlayerScripts") :: Instance
+local Controllers = PlayerScripts:WaitForChild("Controllers") :: Instance
+local GardenSyncModule = Controllers:WaitForChild("GardenSyncController") :: ModuleScript
+local GardenSync = require(GardenSyncModule)
 
-pcall(function()
-    local repStorage = game:GetService("ReplicatedStorage")
-    local sModules = repStorage:WaitForChild("SharedModules", 5)
-    local targetData = sModules:WaitForChild("SprinklerData", 5)
-    if targetData and targetData:IsA("ModuleScript") then
-        local requireExecutor = _G.require or require
-        SprinklerData = requireExecutor(targetData)
-    end
-end)
+local SharedModules = ReplicatedStorage:WaitForChild("SharedModules") :: Instance
+local SprinklerDataModule = SharedModules:WaitForChild("SprinklerData") :: ModuleScript
+local SprinklerData = require(SprinklerDataModule)
 
 local sprinklerInfo = {}
 for _, info in ipairs(SprinklerData) do
@@ -2160,16 +2145,22 @@ end
 
 local function checkIsWhitelisted(category, itemName, currentMutation)
     if not itemName or itemName == "" then return false end
-    local configurationsTable = _G.DecodeAPI and _G.DecodeAPI.Configs
-    if type(configurationsTable) ~= "table" then return false end
-
-    if category == "Plants" and configurationsTable.EspFruitsFilter then
-        if table.find(configurationsTable.EspFruitsFilter, itemName) then
-            return true
+    local Configs = _G.DecodeAPI and _G.DecodeAPI.Configs
+    if not Configs then return false end
+    
+    if category == "Sprinklers" then
+        local filter = Configs.EspSprinklersFilter
+        if type(filter) == "table" then
+            if table.find(filter, itemName) then return true end
+            if #filter == 0 then return true end
         end
-    elseif category == "Sprinklers" and configurationsTable.EspSprinklersFilter then
-        if table.find(configurationsTable.EspSprinklersFilter, itemName) then
-            return true
+    end
+
+    if category == "Plants" then
+        local filter = Configs.EspFruitsFilter
+        if type(filter) == "table" then
+            if table.find(filter, itemName) then return true end
+            if #filter == 0 then return true end
         end
     end
     
@@ -2177,7 +2168,7 @@ local function checkIsWhitelisted(category, itemName, currentMutation)
 end
 
 local function getESPCropWeightKg(instanceObject)
-    local plantModules = game:GetService("ReplicatedStorage"):FindFirstChild("PlantGenerationModules")
+    local plantModules = ReplicatedStorage:FindFirstChild("PlantGenerationModules")
     if not plantModules then return 0 end
     local kg = 0
 
@@ -2235,9 +2226,13 @@ end
 task.spawn(function()
     while true do
         task.wait(1)
-        local configurationsTable = _G.DecodeAPI and _G.DecodeAPI.Configs
 
-        if not configurationsTable or not configurationsTable.EspObjectsToggleState then
+        local Configs = _G.DecodeAPI and _G.DecodeAPI.Configs
+        local isObjectsEnabled = Configs and Configs.EspObjectsToggleState == true
+        local targetMode = Configs and Configs.EspPlotModeSelection or "All Plots"
+        local minWeightThreshold = Configs and tonumber(Configs.EspAboveWeightValue) or 0
+
+        if not isObjectsEnabled then
             local gardensFolder = workspace:FindFirstChild("Gardens")
             if gardensFolder then
                 for _, plot in ipairs(gardensFolder:GetChildren()) do
@@ -2270,13 +2265,6 @@ task.spawn(function()
             continue
         end
 
-        local rawModeSelection = tostring(configurationsTable.EspPlotModeSelection or ""):upper()
-        local targetMode = "ALL PLOTS"
-        if string.find(rawModeSelection, "OWN") then
-            targetMode = "OWN PLOTS"
-        end
-
-        local minWeightThreshold = tonumber(configurationsTable.EspAboveWeightValue) or 0
         local ownPlotId = LocalPlayer:GetAttribute("PlotId")
         local ownPlotName = ownPlotId and ("Plot" .. tostring(ownPlotId)) or nil
 
@@ -2286,24 +2274,20 @@ task.spawn(function()
         local syncedData = {}
         pcall(function()
             syncedData[tostring(LocalPlayer.UserId)] = GardenSync:GetSprinklers(LocalPlayer.UserId)
-            if targetMode == "ALL PLOTS" then
-                for _, p in ipairs(game:GetService("Players"):GetPlayers()) do
+            if targetMode == "All Plots" or targetMode == "" then
+                for _, p in ipairs(Players:GetPlayers()) do
                     syncedData[tostring(p.UserId)] = GardenSync:GetSprinklers(p.UserId)
                 end
             end
         end)
 
         for _, plot in ipairs(gardensFolder:GetChildren()) do
-            if plot.Name:sub(1, 4) == "Plot" or string.find(string.lower(plot.Name), string.lower(LocalPlayer.Name)) then
+            if plot.Name:sub(1, 4) == "Plot" then
                 local isAllowedTarget = false
-                if targetMode == "ALL PLOTS" then
+                if targetMode == "All Plots" or targetMode == "" then
                     isAllowedTarget = true
-                elseif targetMode == "OWN PLOTS" then
-                    if ownPlotName and plot.Name == ownPlotName then
-                        isAllowedTarget = true
-                    elseif string.find(string.lower(plot.Name), string.lower(LocalPlayer.Name)) then
-                        isAllowedTarget = true
-                    end
+                elseif targetMode == "Own Plot" and ownPlotName and plot.Name == ownPlotName then
+                    isAllowedTarget = true
                 end
 
                 local folder = plot:FindFirstChild("Sprinklers")
@@ -2340,7 +2324,6 @@ task.spawn(function()
                         end
                     end
                 end
-
                 local plantsFolder = plot:FindFirstChild("Plants")
                 if plantsFolder then
                     for _, plantModel in ipairs(plantsFolder:GetChildren()) do
@@ -2352,20 +2335,47 @@ task.spawn(function()
                         local fruitsChildren = fruitsSubFolder and fruitsSubFolder:GetChildren()
                         local hasFruits = fruitsChildren and #fruitsChildren > 0
 
-                        if isAllowedTarget and (isWhitelisted or hasFruits) then
-                            local weight = getESPCropWeightKg(plantModel)
+                        if isAllowedTarget and isWhitelisted then
+                            if hasFruits then
+                                local pPart = plantModel.PrimaryPart or plantModel:FindFirstChildWhichIsA("BasePart")
+                                local pGui = pPart and pPart:FindFirstChild("DebugPlantFruitESP") or plantModel:FindFirstChild("DebugPlantFruitESP")
+                                if pGui then pGui:Destroy() end
 
-                            if weight >= minWeightThreshold and weight > 0.05 then
-                                local gui = getBillboard(plantModel, "DebugPlantFruitESP", Color3.fromRGB(255, 215, 0))
-                                if gui then
-                                    gui.Enabled = true
-                                    local displayMut = (mutation ~= "None" and mutation ~= "") and (" [" .. mutation .. "]") or ""
-                                    gui.Timer.Text = string.format("%s%s\n%.2f kg", seedName, displayMut, weight)
+                                for _, fruitModel in ipairs(fruitsChildren) do
+                                    local fName = fruitModel:GetAttribute("CorePartName") or seedName
+                                    local weight = getESPCropWeightKg(fruitModel)
+                                    local fMutation = fruitModel:GetAttribute("Mutation") or mutation
+                                    
+                                    local fruitWhitelisted = checkIsWhitelisted("Plants", fName, fMutation)
+
+                                    if fruitWhitelisted and weight >= minWeightThreshold and weight > 0.05 then
+                                        local gui = getBillboard(fruitModel, "DebugPlantFruitESP", Color3.fromRGB(0, 165, 255))
+                                        if gui then
+                                            gui.Enabled = true
+                                            local displayMut = (fMutation ~= "None" and fMutation ~= "") and (" [" .. fMutation .. "]") or ""
+                                            gui.Timer.Text = string.format("%s%s\n%.2f kg", fName, displayMut, weight)
+                                        end
+                                    else
+                                        local fPart = fruitModel.PrimaryPart or fruitModel:FindFirstChildWhichIsA("BasePart")
+                                        local fGui = fPart and fPart:FindFirstChild("DebugPlantFruitESP") or fruitModel:FindFirstChild("DebugPlantFruitESP")
+                                        if fGui then fGui:Destroy() end
+                                    end
                                 end
                             else
-                                local part = plantModel.PrimaryPart or plantModel:FindFirstChildWhichIsA("BasePart")
-                                local gui = part and part:FindFirstChild("DebugPlantFruitESP") or plantModel:FindFirstChild("DebugPlantFruitESP")
-                                if gui then gui:Destroy() end
+                                local weight = getESPCropWeightKg(plantModel)
+
+                                if weight >= minWeightThreshold and weight > 0.05 then
+                                    local gui = getBillboard(plantModel, "DebugPlantFruitESP", Color3.fromRGB(255, 215, 0))
+                                    if gui then
+                                        gui.Enabled = true
+                                        local displayMut = (mutation ~= "None" and mutation ~= "") and (" [" .. mutation .. "]") or ""
+                                        gui.Timer.Text = string.format("%s%s\n%.2f kg", seedName, displayMut, weight)
+                                    end
+                                else
+                                    local part = plantModel.PrimaryPart or plantModel:FindFirstChildWhichIsA("BasePart")
+                                    local gui = part and part:FindFirstChild("DebugPlantFruitESP") or plantModel:FindFirstChild("DebugPlantFruitESP")
+                                    if gui then gui:Destroy() end
+                                end
                             end
                         else
                             local part = plantModel.PrimaryPart or plantModel:FindFirstChildWhichIsA("BasePart")
@@ -2376,9 +2386,7 @@ task.spawn(function()
                                 for _, fruitModel in ipairs(fruitsSubFolder:GetChildren()) do
                                     local fPart = fruitModel.PrimaryPart or fruitModel:FindFirstChildWhichIsA("BasePart")
                                     local fGui = fPart and fPart:FindFirstChild("DebugPlantFruitESP") or fruitModel:FindFirstChild("DebugPlantFruitESP")
-                                    if fGui then 
-                                        fGui:Destroy() 
-                                    end
+                                    if fGui then fGui:Destroy() end
                                 end
                             end
                         end
@@ -2387,6 +2395,320 @@ task.spawn(function()
 
             end
         end
+    end
+end)
+
+local _G_ActiveStockMultipliers = {}
+local currentHighMultiText = ""
+task.spawn(function()
+    local success, Networking = pcall(function()
+        local sharedModules = game:GetService("ReplicatedStorage"):WaitForChild("SharedModules", 5) :: Instance
+        local netModule = sharedModules:WaitForChild("Networking", 5) :: ModuleScript
+        return require(netModule)
+    end)
+    if success and Networking and Networking.FruitStock then
+        local function parseIncomingSnapshot(p58)
+            if typeof(p58) == "table" and typeof(p58.entries) == "table" then
+                local freshData = {}
+                local highAlerts = {}
+                for fruitName, dataBlock in pairs(p58.entries) do
+                    if typeof(fruitName) == "string" and typeof(dataBlock) == "table" then
+                        local m = typeof(dataBlock.multiplier) == "number" and dataBlock.multiplier or 1
+                        freshData[fruitName] = m
+                        if m >= 4 then
+                            table.insert(highAlerts, string.format("%s %.2fx VALUE!", tostring(fruitName), m))
+                        end
+                    end
+                end
+                _G_ActiveStockMultipliers = freshData
+                currentHighMultiText = #highAlerts > 0 and table.concat(highAlerts, " | ") or ""
+            end
+        end
+        
+        pcall(function()
+            local snapObj = Networking.FruitStock.Snapshot
+            if snapObj then
+                if typeof(snapObj.Connect) == "function" then
+                    snapObj:Connect(parseIncomingSnapshot)
+                elseif snapObj.OnClientEvent then
+                    snapObj.OnClientEvent:Connect(parseIncomingSnapshot)
+                end
+            end
+        end)
+        
+        task.spawn(function()
+            local ok, immediateResult = pcall(function()
+                local reqObj = Networking.FruitStock.Request
+                if typeof(reqObj) == "table" then
+                    if typeof(reqObj.Invoke) == "function" then
+                        return reqObj:Invoke()
+                    elseif typeof(reqObj.InvokeServer) == "function" then
+                        return reqObj:InvokeServer()
+                    elseif typeof(reqObj.Fire) == "function" then
+                        return reqObj:Fire()
+                    end
+                elseif typeof(reqObj) == "function" then
+                    return reqObj()
+                end
+                return nil
+            end)
+            if ok and immediateResult and typeof(immediateResult) == "table" then
+                parseIncomingSnapshot(immediateResult)
+            end
+        end)
+    end
+end)
+
+local function formatValue(value)
+    if value == 0 then return "$0.00" end
+    local suffixes = {"", "K", "M", "B", "T", "Q"}
+    local i = 1
+    local absVal = math.abs(value)
+    while absVal >= 1000 and i < #suffixes do
+        absVal = absVal / 1000
+        i = i + 1
+    end
+    local integerPart = math.floor(absVal)
+    local decimalPart = math.floor((absVal - integerPart) * 100)
+    local formatted = string.format("%d.%02d", integerPart, decimalPart)
+    return "$" .. formatted .. suffixes[i]
+end
+
+local function formatExactNumber(value)
+    local str = tostring(math.floor(math.abs(value)))
+    local formatted = ""
+    local count = 0
+    for i = #str, 1, -1 do
+        formatted = str:sub(i, i) .. formatted
+        count = count + 1
+        if count % 3 == 0 and i ~= 1 then
+            formatted = "," .. formatted
+        end
+    end
+    return formatted
+end
+
+local function injectPriceOverlay(itemFrame, truePriceText)
+    local Configs = _G.DecodeAPI and _G.DecodeAPI.Configs
+    local isEnabled = Configs and Configs.EspInventoryToggleState == true
+    
+    local targetPriceLabel = itemFrame:FindFirstChild("InventoryPriceOverlay")
+    if not targetPriceLabel then
+        targetPriceLabel = Instance.new("TextLabel")
+        targetPriceLabel.Name = "InventoryPriceOverlay"
+        targetPriceLabel.Size = UDim2.new(0.8, 0, 0, 22)
+        targetPriceLabel.Position = UDim2.new(0.06, 0, 0, 4)
+        targetPriceLabel.BackgroundTransparency = 1
+        targetPriceLabel.TextColor3 = Color3.fromRGB(124, 252, 0)
+        targetPriceLabel.TextSize = 14
+        targetPriceLabel.Font = Enum.Font.FredokaOne
+        targetPriceLabel.TextXAlignment = Enum.TextXAlignment.Left
+        targetPriceLabel.TextStrokeTransparency = 0
+        targetPriceLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+        targetPriceLabel.ZIndex = 99999
+        targetPriceLabel.Parent = itemFrame
+    end
+    
+    targetPriceLabel.Visible = isEnabled
+    if targetPriceLabel.Text ~= truePriceText then
+        targetPriceLabel.Text = truePriceText
+    end
+end
+
+local function updateHotbarTotalDisplay(totalPrice)
+    local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+    local backpackGui = playerGui and playerGui:FindFirstChild("BackpackGui")
+    local backpackFrame = backpackGui and backpackGui:FindFirstChild("Backpack")
+    local hotbar = backpackFrame and backpackFrame:FindFirstChild("Hotbar")
+    if not hotbar then return end
+    
+    local totalLabel = hotbar:FindFirstChild("HotbarTotalValueLabel")
+    if not totalLabel then
+        totalLabel = Instance.new("TextLabel")
+        totalLabel.Name = "HotbarTotalValueLabel"
+        totalLabel.Size = UDim2.new(1, 0, 0, 25)
+        totalLabel.Position = UDim2.new(0, 0, 0, -30)
+        totalLabel.BackgroundTransparency = 1
+        totalLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
+        totalLabel.TextSize = 16
+        totalLabel.Font = Enum.Font.FredokaOne
+        totalLabel.TextXAlignment = Enum.TextXAlignment.Center
+        totalLabel.TextStrokeTransparency = 0
+        totalLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+        totalLabel.ZIndex = 999999
+        totalLabel.Parent = hotbar
+    end
+    
+    local alertLabel = hotbar:FindFirstChild("HotbarMultiAlertLabel")
+    if not alertLabel then
+        alertLabel = Instance.new("TextLabel")
+        alertLabel.Name = "HotbarMultiAlertLabel"
+        alertLabel.Size = UDim2.new(1, 0, 0, 22)
+        alertLabel.Position = UDim2.new(0, 0, 0, -52)
+        alertLabel.BackgroundTransparency = 1
+        alertLabel.TextSize = 15
+        alertLabel.Font = Enum.Font.FredokaOne
+        alertLabel.TextXAlignment = Enum.TextXAlignment.Center
+        alertLabel.TextStrokeTransparency = 0
+        alertLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+        alertLabel.ZIndex = 999999
+        alertLabel.Parent = hotbar
+    end
+    
+    local Configs = _G.DecodeAPI and _G.DecodeAPI.Configs
+    local isEnabled = Configs and Configs.EspInventoryToggleState == true
+    
+    totalLabel.Visible = isEnabled
+    local displayString = "Total Fruits Value: " .. formatExactNumber(totalPrice)
+    if totalLabel.Text ~= displayString then totalLabel.Text = displayString end
+    
+    if currentHighMultiText ~= "" and isEnabled then
+        alertLabel.Visible = true
+        if alertLabel.Text ~= currentHighMultiText then alertLabel.Text = currentHighMultiText end
+    else
+        alertLabel.Visible = (currentHighMultiText ~= "") and isEnabled
+    end
+end
+
+task.spawn(function()
+    local playerGui = LocalPlayer:WaitForChild("PlayerGui", 5)
+    if not playerGui then return end
+    while true do
+        for hue = 0, 1, 0.01 do
+            pcall(function()
+                local Configs = _G.DecodeAPI and _G.DecodeAPI.Configs
+                local isEnabled = Configs and Configs.EspInventoryToggleState == true
+                
+                local hotbar = playerGui:FindFirstChild("BackpackGui", true) and playerGui.BackpackGui:FindFirstChild("Backpack") and playerGui.BackpackGui.Backpack:FindFirstChild("Hotbar")
+                local alertLabel = hotbar and hotbar:FindFirstChild("HotbarMultiAlertLabel")
+                if alertLabel then
+                    if currentHighMultiText ~= "" and isEnabled then
+                        alertLabel.Visible = true
+                        if alertLabel.Text ~= currentHighMultiText then alertLabel.Text = currentHighMultiText end
+                        alertLabel.TextColor3 = Color3.fromHSV(hue, 1, 1)
+                    else
+                        alertLabel.Visible = false
+                    end
+                end
+            end)
+            task.wait(0.03)
+        end
+    end
+end)
+
+local function applyPriceSweeper()
+    local Configs = _G.DecodeAPI and _G.DecodeAPI.Configs
+    local isEnabled = Configs and Configs.EspInventoryToggleState == true
+    if not isEnabled then return end
+    
+    local clientGui = LocalPlayer:FindFirstChild("PlayerGui")
+    local backpack = LocalPlayer:FindFirstChild("Backpack")
+    local character = LocalPlayer.Character
+    if not clientGui then return end
+    
+    local runningInventoryTotalValue = 0
+    local accountedFruitIds = {}
+    local backpackFruits = {}
+    
+    local function scanFolder(folder)
+        if not folder then return end
+        local children = folder:GetChildren()
+        for i = 1, #children do
+            local item = children[i]
+            if item:GetAttribute("Fruit") then
+                local uid = item:GetAttribute("Id")
+                if uid then
+                    local uidStr = tostring(uid)
+                    backpackFruits[uidStr] = item
+                    local weight = item:GetAttribute("Weight")
+                    if weight then
+                        backpackFruits["w_" .. string.format("%.2f", tonumber(weight) or 0)] = item
+                    end
+                end
+            end
+        end
+    end
+    
+    scanFolder(backpack)
+    scanFolder(character)
+    
+    local guis = clientGui:GetChildren()
+    for g = 1, #guis do
+        local screenGui = guis[g]
+        if screenGui:IsA("ScreenGui") and screenGui.Enabled and screenGui.Name ~= "FruitTotalWorthTrackerGui" then
+            local descendants = screenGui:GetDescendants()
+            for d = 1, #descendants do
+                local descendant = descendants[d]
+                if descendant:IsA("TextLabel") and descendant.Text:find("kg") then
+                    local slotFrame = descendant.Parent
+                    if slotFrame and slotFrame:IsA("GuiObject") then
+                        local frameId = slotFrame:GetAttribute("Id") or slotFrame.Name
+                        local matchedTool = backpackFruits[tostring(frameId)]
+                        
+                        if not matchedTool then
+                            local visualWeightNum = tonumber(descendant.Text:match("([%d%.]+)"))
+                            if visualWeightNum then
+                                matchedTool = backpackFruits["w_" .. string.format("%.2f", visualWeightNum)]
+                            end
+                        end
+                        
+                        if matchedTool then
+                            local fruitId = matchedTool:GetAttribute("Id")
+                            local fruitIdStr = tostring(fruitId)
+                            
+                            local finalCorrectedValue = 0
+                            
+                            local repStorage = game:GetService("ReplicatedStorage") :: Instance
+                            local sharedModules = repStorage:WaitForChild("SharedModules") :: Instance
+                            local netModule = sharedModules:WaitForChild("Networking") :: ModuleScript
+                            local Networking = require(netModule)
+                            
+                            local networkSuccess, serverBid = pcall(function()
+                                if typeof(Networking.NPCS.GetFruitBid.Invoke) == "function" then
+                                    return Networking.NPCS.GetFruitBid:Invoke(fruitId)
+                                else
+                                    return Networking.NPCS.GetFruitBid.Fire(Networking.NPCS.GetFruitBid, fruitId)
+                                end
+                            end)
+                            
+                            if networkSuccess and serverBid and serverBid.CurrentSellValue then
+                                finalCorrectedValue = serverBid.CurrentSellValue
+                            else
+                                pcall(function()
+                                    local clientDataModule = sharedModules:WaitForChild("ClientData") :: ModuleScript
+                                    local clientData = require(clientDataModule)
+                                    local invData = clientData and clientData:GetInventory()
+                                    if invData and invData.Fruits then
+                                        for _, itemData in pairs(invData.Fruits) do
+                                            if tostring(itemData.Id) == fruitIdStr and itemData.CachedSellValue then
+                                                finalCorrectedValue = itemData.CachedSellValue
+                                                break
+                                            end
+                                        end
+                                    end
+                                end)
+                            end
+                            
+                            if finalCorrectedValue > 0 then
+                                injectPriceOverlay(slotFrame, formatValue(finalCorrectedValue))
+                                if fruitId and not accountedFruitIds[fruitIdStr] then
+                                    accountedFruitIds[fruitIdStr] = true
+                                    runningInventoryTotalValue = runningInventoryTotalValue + finalCorrectedValue
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    updateHotbarTotalDisplay(runningInventoryTotalValue)
+end
+
+task.spawn(function()
+    while true do
+        pcall(applyPriceSweeper)
+        task.wait(1.5)
     end
 end)
 
