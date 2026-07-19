@@ -1,4 +1,3 @@
--- test
 local Decode = {}
 
 local CoreGui = game:GetService("CoreGui")
@@ -410,9 +409,9 @@ UI.TitleLabel = Instance.new("TextLabel")
 UI.TitleLabel.Size = UDim2.new(0, 200, 1, 0)
 UI.TitleLabel.Position = UDim2.new(0, 14, 0, 0)
 UI.TitleLabel.BackgroundTransparency = 1
-UI.TitleLabel.Text = "Decode"
+UI.TitleLabel.Text = "DECODE | v1.1.0.0"
 UI.TitleLabel.TextColor3 = Decode.Theme.TextMuted
-UI.TitleLabel.TextSize = 14
+UI.TitleLabel.TextSize = 16
 UI.TitleLabel.Font = Enum.Font.SourceSansBold
 UI.TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
 UI.TitleLabel.Parent = UI.TopHeader
@@ -2129,74 +2128,63 @@ UI.FpsBoostToggle = Decode:AddToggle(UI.FpsDrop, "FPS Boost", function(state)
     saveConfig()
 end)
 
-local function hexToColor3(hex)
-    hex = hex:gsub("%s+", ""):gsub("#", "")
-    if #hex ~= 6 then return nil end
-    local r = tonumber(hex:sub(1, 2), 16)
-    local g = tonumber(hex:sub(3, 4), 16)
-    local b = tonumber(hex:sub(5, 6), 16)
-    if r and g and b then
-        return Color3.fromRGB(r, g, b)
-    end
-    return nil
+local function numToRgbTable(num)
+    if not num then return {255, 255, 255} end
+    local r = math.floor(num / 65536) % 256
+    local g = math.floor(num / 256) % 256
+    local b = num % 256
+    return {r, g, b}
 end
 
-local function handleHexInput(themeKey, hexString, selectorObj)
-    if not hexString or hexString == "" then return end
-    
-    if not hexString:find("^#") and #hexString == 6 then
-        hexString = "#" .. hexString
+local function handleSliderHexInput(themeKey, numericValue)
+    local rgbTable = numToRgbTable(numericValue)
+    if themeKey == "MainBackground" then Configurations.MainHue = rgbTable
+    elseif themeKey == "SidebarBackground" then Configurations.SidebarHue = rgbTable
+    elseif themeKey == "AccentColor" then Configurations.AccentHue = rgbTable
+    elseif themeKey == "ElementBackground" then Configurations.ElementHue = rgbTable
+    elseif themeKey == "TextMain" then Configurations.TextMainHue = rgbTable
+    elseif themeKey == "TextMuted" then Configurations.TextMutedHue = rgbTable
     end
-    
-    local newColor = hexToColor3(hexString)
-    if newColor then
-        local rgbTable = {math.floor(newColor.R * 255), math.floor(newColor.G * 255), math.floor(newColor.B * 255)}
-        if themeKey == "MainBackground" then Configurations.MainHue = rgbTable
-        elseif themeKey == "SidebarBackground" then Configurations.SidebarHue = rgbTable
-        elseif themeKey == "AccentColor" then Configurations.AccentHue = rgbTable
-        elseif themeKey == "ElementBackground" then Configurations.ElementHue = rgbTable
-        elseif themeKey == "TextMain" then Configurations.TextMainHue = rgbTable
-        elseif themeKey == "TextMuted" then Configurations.TextMutedHue = rgbTable
-        end
-        saveConfig()
-        Decode:RefreshTheme()
-        if selectorObj and selectorObj.UpdateSelectionText then
-            selectorObj:UpdateSelectionText(hexString:upper())
-        end
-    end
+    saveConfig()
+    Decode:RefreshTheme()
+end
+
+local function rgbTableToHexNum(rgbTable)
+    if type(rgbTable) ~= "table" or #rgbTable ~= 3 then return 0xFFFFFF end
+    return (rgbTable[1] * 65536) + (rgbTable[2] * 256) + rgbTable[3]
 end
 
 UI.ThemeDrop = Decode:CreateDropdown(UI.CreatedPages["Settings"], "Theme")
 
 Decode:AddLabel(UI.ThemeDrop, "- [ Main Color ] -")
-UI.MainColorHex = Decode:AddSelector(UI.ThemeDrop, "Type Hex (e.g. 0A121E)", {}, function(chosen, selectorObj)
-    handleHexInput("MainBackground", chosen, selectorObj)
-end)
+Decode:AddSlider(UI.ThemeDrop, "Main Color Hex", rgbTableToHexNum(Configurations.MainHue), function(value)
+    handleSliderHexInput("MainBackground", value)
+end, "Type value like 0x0A121E")
 
 Decode:AddLabel(UI.ThemeDrop, "- [ Side Bar Color ] -")
-UI.SidebarColorHex = Decode:AddSelector(UI.ThemeDrop, "Type Hex (e.g. 151B2C)", {}, function(chosen, selectorObj)
-    handleHexInput("SidebarBackground", chosen, selectorObj)
-end)
+Decode:AddSlider(UI.ThemeDrop, "Sidebar Color Hex", rgbTableToHexNum(Configurations.SidebarHue), function(value)
+    handleSliderHexInput("SidebarBackground", value)
+end, "Type value like 0x151B2C")
 
 Decode:AddLabel(UI.ThemeDrop, "- [ Accent Color ] -")
-UI.AccentColorHex = Decode:AddSelector(UI.ThemeDrop, "Type Hex (e.g. 0EA5E9)", {}, function(chosen, selectorObj)
-    handleHexInput("AccentColor", chosen, selectorObj)
-end)
+Decode:AddSlider(UI.ThemeDrop, "Accent Color Hex", rgbTableToHexNum(Configurations.AccentHue), function(value)
+    handleSliderHexInput("AccentColor", value)
+end, "Type value like 0x0EA5E9")
 
 Decode:AddLabel(UI.ThemeDrop, "- [ Element Color ] -")
-UI.ElementColorHex = Decode:AddSelector(UI.ThemeDrop, "Type Hex (e.g. 16263E)", {}, function(chosen, selectorObj)
-    handleHexInput("ElementBackground", chosen, selectorObj)
-end)
+Decode:AddSlider(UI.ThemeDrop, "Element Color Hex", rgbTableToHexNum(Configurations.ElementHue), function(value)
+    handleSliderHexInput("ElementBackground", value)
+end, "Type value like 0x16263E")
 
 Decode:AddLabel(UI.ThemeDrop, "- [ Main Text Color ] -")
-UI.MainTextColorHex = Decode:AddSelector(UI.ThemeDrop, "Type Hex (e.g. FFFFFF)", {}, function(chosen, selectorObj)
-    handleHexInput("TextMain", chosen, selectorObj)
-end)
+Decode:AddSlider(UI.ThemeDrop, "Main Text Hex", rgbTableToHexNum(Configurations.TextMainHue), function(value)
+    handleSliderHexInput("TextMain", value)
+end, "Type value like 0xFFFFFF")
 
 Decode:AddLabel(UI.ThemeDrop, "- [ Muted Text Color ] -")
-UI.MutedTextColorHex = Decode:AddSelector(UI.ThemeDrop, "Type Hex (e.g. 8CA0B9)", {}, function(chosen, selectorObj)
-    handleHexInput("TextMuted", chosen, selectorObj)
-end)
+Decode:AddSlider(UI.ThemeDrop, "Muted Text Hex", rgbTableToHexNum(Configurations.TextMutedHue), function(value)
+    handleSliderHexInput("TextMuted", value)
+end, "Type value like 0x8CA0B9")
 
 task.spawn(function()
     task.wait(0.1)
