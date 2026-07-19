@@ -1,4 +1,4 @@
--- 1
+-- 2
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
@@ -2077,7 +2077,6 @@ pcall(function()
     local controllerInstance = LocalPlayer:FindFirstChild("PlayerScripts")
     controllerInstance = controllerInstance and controllerInstance:FindFirstChild("Controllers")
     controllerInstance = controllerInstance and controllerInstance:FindFirstChild("GardenSyncController")
-    
     if controllerInstance and controllerInstance:IsA("ModuleScript") then
         GardenSync = require(controllerInstance)
     end
@@ -2086,7 +2085,6 @@ end)
 pcall(function()
     local sharedFolder = game:GetService("ReplicatedStorage"):FindFirstChild("SharedModules")
     local sprinklerMod = sharedFolder and sharedFolder:FindFirstChild("SprinklerData")
-    
     if sprinklerMod and sprinklerMod:IsA("ModuleScript") then
         SprinklerData = require(sprinklerMod)
     end
@@ -2148,7 +2146,7 @@ local function getBillboard(model, guiName, textColor)
     label.Size = UDim2.fromScale(1, 1)
     label.BackgroundTransparency = 1
     label.TextScaled = false
-    label.TextSize = 20
+    label.TextSize = 15
     label.Font = Enum.Font.SourceSans
     label.TextStrokeTransparency = 0.3
     label.TextStrokeColor3 = Color3.new(0,0,0)
@@ -2163,10 +2161,22 @@ local function checkIsWhitelisted(category, itemName, currentMutation)
     local Configs = _G.DecodeAPI and _G.DecodeAPI.Configs
     if not Configs then return false end
     
+    local cleanItemName = tostring(itemName):lower():gsub("%s+", ""):gsub("_+", ""):gsub("-+", "")
+    
     if category == "Plants" and Configs.EspFruitsFilter then
-        if table.find(Configs.EspFruitsFilter, tostring(itemName)) then return true end
+        for _, filterValue in ipairs(Configs.EspFruitsFilter) do
+            local cleanFilter = tostring(filterValue):lower():gsub("%s+", ""):gsub("_+", ""):gsub("-+", "")
+            if cleanItemName == cleanFilter or cleanItemName:find(cleanFilter, 1, true) or cleanFilter:find(cleanItemName, 1, true) then
+                return true
+            end
+        end
     elseif category == "Sprinklers" and Configs.EspSprinklersFilter then
-        if table.find(Configs.EspSprinklersFilter, tostring(itemName)) then return true end
+        for _, filterValue in ipairs(Configs.EspSprinklersFilter) do
+            local cleanFilter = tostring(filterValue):lower():gsub("%s+", ""):gsub("_+", ""):gsub("-+", "")
+            if cleanItemName == cleanFilter or cleanItemName:find(cleanFilter, 1, true) or cleanFilter:find(cleanItemName, 1, true) then
+                return true
+            end
+        end
     end
     
     return false
@@ -2266,8 +2276,13 @@ task.spawn(function()
             continue
         end
 
-        local rawMode = tostring(Configs.EspPlotModeSelection or ""):upper()
-        local targetMode = (rawMode == "OWN PLOT" or rawMode == "OWN PLOTS") and "OWN PLOTS" or "ALL PLOTS"
+        local rawMode = tostring(Configs.EspPlotModeSelection or ""):upper():gsub("%s+", "")
+        local targetMode = "ALL PLOTS"
+        
+        if string.find(rawMode, "OWN") or string.find(rawMode, "PLOT") and not string.find(rawMode, "ALL") then
+            targetMode = "OWN PLOTS"
+        end
+        
         local minWeightThreshold = tonumber(Configs.EspAboveWeightValue) or 0
         local ownPlotId = LocalPlayer:GetAttribute("PlotId")
         local ownPlotName = ownPlotId and ("Plot" .. tostring(ownPlotId)) or nil
