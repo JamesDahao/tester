@@ -1,4 +1,3 @@
--- Test1
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
@@ -1740,6 +1739,335 @@ task.spawn(function()
             task.cancel(runThread)
         end
     }
+end)
+
+task.spawn(function()
+    while true do
+        local Configs = _G.DecodeAPI and _G.DecodeAPI.Configs
+        if Configs and Configs.AutoDropItemsEnabled == true then
+            pcall(function()
+                local Character = LocalPlayer.Character
+                local Backpack = LocalPlayer:FindFirstChild("Backpack")
+                local PlayerGui = LocalPlayer:FindFirstChild("PlayerGui")
+                
+                local networkingModule = game:GetService("ReplicatedStorage"):FindFirstChild("Networking", true)
+                local success, Network = pcall(require, networkingModule)
+                
+                local sharedModules = game:GetService("ReplicatedStorage"):FindFirstChild("SharedModules", true)
+                local proxyUtilMod = sharedModules and sharedModules:FindFirstChild("FruitProxyUtil")
+                local successUtil, FruitProxyUtil = pcall(require, proxyUtilMod)
+                
+                if Character and Backpack and PlayerGui and success and type(Network) == "table" and Network.DroppedItem and Network.DroppedItem.RequestDrop then
+                    local dropRemote = Network.DroppedItem.RequestDrop
+                    local fireMethod = type(dropRemote.FireServer) == "function" and "FireServer" or "Fire"
+                    
+                    if Character:FindFirstChildOfClass("Tool") then
+                        while Character:FindFirstChildOfClass("Tool") do
+                            task.wait(0.05)
+                        end
+                    end
+                    
+                    local droppedSomething = false
+                    
+                    if Configs.DropFruitsFilter and type(Configs.DropFruitsFilter) == "table" and #Configs.DropFruitsFilter > 0 then
+                        for _, cleanItemName in ipairs(Configs.DropFruitsFilter) do
+                            if Character:FindFirstChildOfClass("Tool") then break end
+                            
+                            local targetId = nil
+                            local isProxy = false
+                            local targetObject = nil
+                            
+                            for _, obj in ipairs(Backpack:GetChildren()) do
+                                local attrFruitName = obj:GetAttribute("Fruit")
+                                local literalName = obj.Name
+                                local itemId = obj:GetAttribute("Id")
+                                local isFavorite = obj:GetAttribute("IsFavorite")
+                                
+                                local isPotted = obj:GetAttribute("PottedPlant") or obj:GetAttribute("IsPotted") or obj:GetAttribute("Potted")
+                                if isPotted == true then continue end
+                                
+                                local isTargetName = false
+                                if (attrFruitName and tostring(attrFruitName):lower() == tostring(cleanItemName):lower()) or 
+                                   string.find(literalName:lower(), tostring(cleanItemName):lower(), 1, true) then
+                                    isTargetName = true
+                                end
+                                
+                                if isTargetName and itemId and not isFavorite then
+                                    targetId = tostring(itemId)
+                                    targetObject = obj
+                                    isProxy = obj:IsA("Configuration") or (obj:GetAttribute("FruitProxy") == true)
+                                    break
+                                end
+                            end
+                            
+                            if targetObject and targetId then
+                                local liveToolInstance = nil
+                                
+                                if isProxy and successUtil and type(FruitProxyUtil) == "table" then
+                                    pcall(function() FruitProxyUtil.RequestPromote(targetId) end)
+                                    
+                                    local timeout = 0
+                                    while timeout < 25 do
+                                        task.wait(0.1)
+                                        timeout = timeout + 1
+                                        
+                                        local freshBackpack = LocalPlayer:FindFirstChild("Backpack")
+                                        if freshBackpack then
+                                            for _, bpObj in ipairs(freshBackpack:GetChildren()) do
+                                                if bpObj:IsA("Tool") and tostring(bpObj:GetAttribute("Id")) == targetId then
+                                                    liveToolInstance = bpObj
+                                                    break
+                                                end
+                                            end
+                                        end
+                                        if liveToolInstance then break end
+                                    end
+                                else
+                                    liveToolInstance = targetObject
+                                end
+                                
+                                if liveToolInstance and liveToolInstance:IsA("Tool") then
+                                    if liveToolInstance.Parent == Backpack then
+                                        liveToolInstance.Parent = Character
+                                        task.wait(0.15)
+                                    end
+                                    
+                                    if liveToolInstance.Parent == Character then
+                                        while liveToolInstance.Parent == Character do
+                                            local dropExecuted, _ = pcall(function() 
+                                                dropRemote[fireMethod](dropRemote, "HarvestedFruits", targetId) 
+                                            end)
+                                            task.wait(0.5)
+                                            
+                                            if not dropExecuted or liveToolInstance.Parent == Character then
+                                                task.wait(2.0)
+                                            else
+                                                droppedSomething = true
+                                                break
+                                            end
+                                        end
+                                        task.wait(0.05)
+                                    end
+                                end
+                            end
+                        end
+                    end
+
+                    if Configs.DropPetsFilter and type(Configs.DropPetsFilter) == "table" and #Configs.DropPetsFilter > 0 then
+                        for _, cleanItemName in ipairs(Configs.DropPetsFilter) do
+                            
+                            -- Scan Backpack first
+                            for _, tool in ipairs(Backpack:GetChildren()) do
+                                if tool:IsA("Tool") and tool:GetAttribute("PetId") then
+                                    local pName = tool:GetAttribute("Pet") or tool.Name
+                                    local pId = tool:GetAttribute("PetId")
+                                    if pId and tostring(pName):lower() == tostring(cleanItemName):lower() then
+                                        if tool.Parent == Backpack then
+                                            tool.Parent = Character
+                                            task.wait(0.05)
+                                        end
+                                        
+                                        while tool.Parent == Character do
+                                            local dropExecuted = pcall(function() dropRemote[fireMethod](dropRemote, "Pets", tostring(pId)) end)
+                                            task.wait(0.5)
+                                            if not dropExecuted or tool.Parent == Character then
+                                                task.wait(2.0)
+                                            else
+                                                droppedSomething = true
+                                                break
+                                            end
+                                        end
+                                        task.wait(0.05)
+                                        break
+                                    end
+                                end
+                            end
+
+                            if not droppedSomething and Character then
+                                for _, tool in ipairs(Character:GetChildren()) do
+                                    if tool:IsA("Tool") and tool:GetAttribute("PetId") then
+                                        local pName = tool:GetAttribute("Pet") or tool.Name
+                                        local pId = tool:GetAttribute("PetId")
+                                        if pId and tostring(pName):lower() == tostring(cleanItemName):lower() then
+                                            
+                                            while tool.Parent == Character do
+                                                local dropExecuted = pcall(function() dropRemote[fireMethod](dropRemote, "Pets", tostring(pId)) end)
+                                                task.wait(0.5)
+                                                if not dropExecuted or tool.Parent == Character then
+                                                    task.wait(2.0)
+                                                else
+                                                    droppedSomething = true
+                                                    break
+                                                end
+                                            end
+                                            task.wait(0.05)
+                                            break
+                                        end
+                                    end
+                                end
+                            end
+
+                        end
+                    end
+                    
+                    if droppedSomething then
+                        task.wait(0.2)
+                    end
+                end
+            end)
+            
+            local sliderSpeed = tonumber(Configs.DropTweenSpeed) or 1
+            task.wait(math.max(sliderSpeed, 0.1))
+        else
+            task.wait(1.0)
+        end
+    end
+end)
+
+task.spawn(function()
+    local currentLockedTarget = nil
+    
+    while true do
+        local Configs = _G.DecodeAPI and _G.DecodeAPI.Configs
+        if Configs and Configs.CollectDroppedItemsEnabled == true then
+            pcall(function()
+                local Character = LocalPlayer.Character
+                local RootPart = Character and Character:FindFirstChild("HumanoidRootPart")
+                local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
+                
+                if not RootPart or not Humanoid or Humanoid.Health <= 0 then return end
+                
+                local clientFolder = workspace:FindFirstChild("DroppedItems")
+                if not clientFolder then return end
+                
+                local standingVerticalOffset = Humanoid.HipHeight + (RootPart.Size.Y / 2)
+                
+                local stillValid = false
+                if currentLockedTarget and currentLockedTarget.Parent == clientFolder then
+                    stillValid = true
+                else
+                    currentLockedTarget = nil
+                end
+                
+                if not stillValid then
+                    local activeDrops = clientFolder:GetChildren()
+                    local closestDistance = math.huge
+                    
+                    for idx = 1, #activeDrops do
+                        local container = activeDrops[idx]
+                        local visualPart = container:IsA("BasePart") and container or container:FindFirstChildOfClass("BasePart", true)
+                        local dropPosition = visualPart and visualPart.Position or container:GetPivot().Position
+                        
+                        local distanceToPlayer = (dropPosition - RootPart.Position).Magnitude
+                        if distanceToPlayer < closestDistance then
+                            closestDistance = distanceToPlayer
+                            currentLockedTarget = container
+                        end
+                    end
+                end
+                
+                if currentLockedTarget then
+                    local visualPart = currentLockedTarget:IsA("BasePart") and currentLockedTarget or currentLockedTarget:FindFirstChildOfClass("BasePart", true)
+                    local targetPosition = visualPart and visualPart.Position or currentLockedTarget:GetPivot().Position
+                    
+                    local safeTargetCoordinates = Vector3.new(targetPosition.X, targetPosition.Y + standingVerticalOffset, targetPosition.Z)
+                    local distance = (safeTargetCoordinates - RootPart.Position).Magnitude
+                    local speed = tonumber(Configs.DropTweenSpeed) or 16
+                    
+                    if distance > 3 then
+                        if speed > 50 then
+                            local maxChunkSize = 25
+                            local currentPos = RootPart.Position
+                            local totalVector = safeTargetCoordinates - currentPos
+                            local totalDistance = totalVector.Magnitude
+                            local direction = totalVector.Unit
+                            local steps = math.floor(totalDistance / maxChunkSize)
+                            
+                            for step = 1, steps do
+                                if not currentLockedTarget or not currentLockedTarget.Parent or Configs.CollectDroppedItemsEnabled ~= true then break end
+                                RootPart.CFrame = CFrame.new(currentPos + (direction * (step * maxChunkSize)))
+                                task.wait(0.01)
+                            end
+                            if currentLockedTarget and currentLockedTarget.Parent and Configs.CollectDroppedItemsEnabled == true then
+                                RootPart.CFrame = CFrame.new(safeTargetCoordinates)
+                            end
+                            task.wait(0.05)
+                        else
+                            if speed <= 5 then speed = 16 end
+                            local startCFrame = RootPart.CFrame
+                            local targetCFrame = CFrame.new(safeTargetCoordinates)
+                            local duration = distance / speed
+                            local elapsed = 0
+                            
+                            local antiGravityConn
+                            antiGravityConn = game:GetService("RunService").PostSimulation:Connect(function()
+                                if RootPart then 
+                                    RootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0) 
+                                end
+                            end)
+                            
+                            while elapsed < duration and Configs.CollectDroppedItemsEnabled == true and Humanoid.Health > 0 do
+                                if not currentLockedTarget or not currentLockedTarget.Parent then break end
+                                elapsed = elapsed + task.wait()
+                                local alpha = math.clamp(elapsed / duration, 0, 1)
+                                RootPart.CFrame = startCFrame:Lerp(targetCFrame, alpha)
+                            end
+                            
+                            if antiGravityConn then antiGravityConn:Disconnect() end
+                        end
+                    end
+                    local foundPrompt = nil
+                    local anchor = currentLockedTarget:FindFirstChild("PromptAnchor")
+                    if anchor then
+                        foundPrompt = anchor:FindFirstChildOfClass("ProximityPrompt")
+                    end
+                    
+                    if not foundPrompt then
+                        foundPrompt = currentLockedTarget:FindFirstChildOfClass("ProximityPrompt", true)
+                    end
+                    
+                    if foundPrompt and foundPrompt.Parent then
+                        foundPrompt.RequiresLineOfSight = false
+                        foundPrompt.ClickablePrompt = true
+                        
+                        local oldHold = foundPrompt.HoldDuration
+                        foundPrompt.HoldDuration = 0
+                        
+                        foundPrompt.Enabled = false
+                        task.wait()
+                        foundPrompt.Enabled = true
+                        
+                        local maximumRetryTimeout = 0
+                        while currentLockedTarget and currentLockedTarget.Parent and foundPrompt and foundPrompt.Parent and maximumRetryTimeout < 15 do
+                            if Configs.CollectDroppedItemsEnabled ~= true or Humanoid.Health <= 0 then break end
+                            
+                            local nativeFirePrompt = (shared or _G).fireproximityprompt or _G.fireproximityprompt or (shared or _G).fire_proximity_prompt
+                            
+                            if nativeFirePrompt then
+                                pcall(function() nativeFirePrompt(foundPrompt, 1) end)
+                            else
+                                foundPrompt:InputHoldBegin()
+                                task.wait(0.01)
+                                foundPrompt:InputHoldEnd()
+                            end
+                            
+                            maximumRetryTimeout = maximumRetryTimeout + 1
+                            task.wait(0.02)
+                        end
+                        
+                        pcall(function() foundPrompt.HoldDuration = oldHold end)
+                    end
+                    
+                    currentLockedTarget = nil
+                    task.wait(0.05) 
+                end
+            end)
+            task.wait(0.05)
+        else
+            currentLockedTarget = nil
+            task.wait(1.0)
+        end
+    end
 end)
 
 print("Decode: Function Loaded.")
