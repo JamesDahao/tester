@@ -1,13 +1,22 @@
--- 1
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local TweenService = game:GetService("TweenService")
+local Lighting = game:GetService("Lighting")
 
 local LocalPlayer = Players.LocalPlayer
 local cachedGardenSyncController = nil
 local currentLockedTarget = nil
 local currentLockedPrompt = nil
+local _G_ActiveStockMultipliers = {}
+local currentHighMultiText = ""
+local PlayerScripts = LocalPlayer:WaitForChild("PlayerScripts") :: Instance
+local Controllers = PlayerScripts:WaitForChild("Controllers") :: Instance
+local GardenSyncModule = Controllers:WaitForChild("GardenSyncController") :: ModuleScript
+local GardenSync = require(GardenSyncModule)
+local SharedModules = ReplicatedStorage:WaitForChild("SharedModules") :: Instance
+local SprinklerDataModule = SharedModules:WaitForChild("SprinklerData") :: ModuleScript
+local SprinklerData = require(SprinklerDataModule)
 
 task.spawn(function()
     local playerScripts = LocalPlayer:WaitForChild("PlayerScripts", 10)
@@ -2071,15 +2080,6 @@ task.spawn(function()
     end
 end)
 
-local PlayerScripts = LocalPlayer:WaitForChild("PlayerScripts") :: Instance
-local Controllers = PlayerScripts:WaitForChild("Controllers") :: Instance
-local GardenSyncModule = Controllers:WaitForChild("GardenSyncController") :: ModuleScript
-local GardenSync = require(GardenSyncModule)
-
-local SharedModules = ReplicatedStorage:WaitForChild("SharedModules") :: Instance
-local SprinklerDataModule = SharedModules:WaitForChild("SprinklerData") :: ModuleScript
-local SprinklerData = require(SprinklerDataModule)
-
 local sprinklerInfo = {}
 for _, info in ipairs(SprinklerData) do
     sprinklerInfo[info.SprinklerName] = info
@@ -2399,8 +2399,6 @@ task.spawn(function()
     end
 end)
 
-local _G_ActiveStockMultipliers = {}
-local currentHighMultiText = ""
 task.spawn(function()
     local success, Networking = pcall(function()
         local sharedModules = game:GetService("ReplicatedStorage"):WaitForChild("SharedModules", 5) :: Instance
@@ -2736,6 +2734,201 @@ task.spawn(function()
     while true do
         pcall(applyPriceSweeper)
         task.wait(1.5)
+    end
+end)
+
+local function hideFolderContents(folder, forceState)
+    if not folder then return end
+    local children = folder:GetChildren()
+    for i = 1, #children do
+        local model = children[i]
+        local descendants = model:GetDescendants()
+        for j = 1, #descendants do
+            local item = descendants[j]
+            if item:IsA("BasePart") then
+                local targetTransparency = forceState and 1 or 0
+                if item.Transparency ~= targetTransparency then
+                    item.Transparency = targetTransparency
+                    item.CanCollide = not forceState
+                end
+            elseif item:IsA("Decal") or item:IsA("Texture") then
+                local targetTransparency = forceState and 1 or 0
+                if item.Transparency ~= targetTransparency then
+                    item.Transparency = targetTransparency
+                end
+            elseif item:IsA("ParticleEmitter") or item:IsA("Trail") or item:IsA("Smoke") or item:IsA("Sparkles") or item:IsA("Fire") or item:IsA("Beam") then
+                local targetEnabled = not forceState
+                if item.Enabled ~= targetEnabled then
+                    item.Enabled = targetEnabled
+                end
+            end
+        end
+    end
+end
+
+local function cleanAsset(obj)
+    if obj:IsA("BasePart") and not obj:IsA("Terrain") then
+        obj.Material = Enum.Material.SmoothPlastic
+        obj.Reflectance = 0
+        obj.CastShadow = false
+    elseif obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Smoke") or obj:IsA("Sparkles") or obj:IsA("Fire") or obj:IsA("Beam") then
+        obj.Enabled = false
+    elseif obj:IsA("Texture") or obj:IsA("Decal") then
+        pcall(function() obj:Destroy() end)
+    elseif obj:IsA("MeshPart") then
+        obj.RenderFidelity = Enum.RenderFidelity.Performance
+        obj.Material = Enum.Material.SmoothPlastic
+        obj.CastShadow = false
+    elseif obj:IsA("SpecialMesh") then
+        obj.TextureId = ""
+    end
+end
+
+task.spawn(function()
+    local lastGraphicsState = false
+    local lastPlantsState = false
+    local lastSprinklersState = false
+    local hiddenPlotsTracker = {}
+
+    while task.wait(1.5) do
+        local Configs = _G.DecodeAPI and _G.DecodeAPI.Configs
+        local isBoostActive = Configs and Configs.FpsBoostToggleState == true
+        local currentOption = Configs and Configs.FpsOptionSelection or ""
+
+        local gardens = Workspace:FindFirstChild("Gardens")
+
+        if isBoostActive then
+            if gardens then
+                local plots = gardens:GetChildren()
+                
+                local shouldHideMyPlot = (currentOption == "Remove My Plot")
+                local shouldHideOtherPlots = (currentOption == "Remove Other Plots")
+                local shouldHidePlants = (currentOption == "Hide All Plants")
+                local shouldHideSprinklers = (currentOption == "Hide All Sprinklers")
+
+                local myUserId = LocalPlayer and LocalPlayer.UserId
+                local myName = LocalPlayer and LocalPlayer.Name
+
+                for p = 1, #plots do
+                    local plot = plots[p]
+                    if plot:IsA("Instance") then
+                        local ownerId = plot:GetAttribute("OwnerUserId")
+                        local ownerName = plot:GetAttribute("Owner")
+                        local isMyPlot = (ownerId == myUserId) or (ownerName == myName)
+
+                        if isMyPlot and shouldHideMyPlot then
+                            hiddenPlotsTracker[plot] = true
+                            hideFolderContents(plot, true)
+                        elseif not isMyPlot and shouldHideOtherPlots then
+                            hiddenPlotsTracker[plot] = true
+                            hideFolderContents(plot, true)
+                        else
+                            if hiddenPlotsTracker[plot] then
+                                hiddenPlotsTracker[plot] = nil
+                                hideFolderContents(plot, false)
+                            end
+                        end
+
+                        if shouldHidePlants then
+                            hideFolderContents(plot:FindFirstChild("Plants"), true)
+                        elseif lastPlantsState then
+                            hideFolderContents(plot:FindFirstChild("Plants"), false)
+                        end
+                        
+                        if shouldHideSprinklers then
+                            hideFolderContents(plot:FindFirstChild("Sprinklers"), true)
+                        elseif lastSprinklersState then
+                            hideFolderContents(plot:FindFirstChild("Sprinklers"), false)
+                        end
+                    end
+                end
+                
+                lastPlantsState = shouldHidePlants
+                lastSprinklersState = shouldHideSprinklers
+            end
+
+            if currentOption == "Lowest Graphics" then
+                if not lastGraphicsState then
+                    lastGraphicsState = true
+                    
+                    for _, child in ipairs(Lighting:GetChildren()) do
+                        pcall(function() child:Destroy() end)
+                    end
+                    
+                    local pScripts = LocalPlayer:FindFirstChild("PlayerScripts")
+                    local ctrl = pScripts and pScripts:FindFirstChild("Controllers")
+                    local lCtrl = ctrl and ctrl:FindFirstChild("LightingController")
+                    if lCtrl and lCtrl:IsA("ModuleScript") then
+                        pcall(function()
+                            local mod = require(lCtrl)
+                            if type(mod) == "table" and not _G.OilyNeutralized then
+                                local flat = {
+                                    ["Ambient"] = Color3.fromRGB(150, 150, 150),
+                                    ["Brightness"] = 1,
+                                    ["ColorShift_Bottom"] = Color3.fromRGB(0, 0, 0),
+                                    ["ColorShift_Top"] = Color3.fromRGB(0, 0, 0),
+                                    ["OutdoorAmbient"] = Color3.fromRGB(150, 150, 150),
+                                    ["ClockTime"] = 12,
+                                    ["EnvironmentDiffuseScale"] = 0
+                                }
+                                mod.GetDefault = function() return flat end
+                                mod.GetCurrentTarget = function() return flat end
+                                mod.TransitionTo = function() end
+                                mod.SetImmediate = function() end
+                                _G.OilyNeutralized = true
+                            end
+                        end)
+                    end
+                    
+                    settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+                    pcall(function() Lighting.GlobalShadows = false end)
+                    pcall(function() Lighting.FogEnd = 9e9 end)
+                    pcall(function() Lighting.Ambient = Color3.fromRGB(150, 150, 150) end)
+                    pcall(function() Lighting.OutdoorAmbient = Color3.fromRGB(150, 150, 150) end)
+                    pcall(function() Lighting.Brightness = 1 end)
+                    pcall(function() Lighting.EnvironmentDiffuseScale = 0 end)
+                    
+                    local terrain = Workspace.Terrain
+                    pcall(function() terrain.WaterWaveSize = 0 end)
+                    pcall(function() terrain.WaterWaveSpeed = 0 end)
+                    pcall(function() terrain.WaterReflectance = 0 end)
+                    pcall(function() terrain.WaterTransparency = 0 end)
+                    pcall(function() terrain.Decoration = false end)
+                    
+                    local descendants = Workspace:GetDescendants()
+                    for i = 1, #descendants do
+                        local item = descendants[i]
+                        if item:IsA("Explosion") or item:IsA("ForceField") or item:IsA("Highlight") or item:IsA("SelectionBox") or item:IsA("SelectionObject") or item:IsA("Clouds") then
+                            pcall(function() item:Destroy() end)
+                        elseif not (gardens and item:IsDescendantOf(gardens)) then
+                            cleanAsset(item)
+                        end
+                    end
+                end
+            else
+                lastGraphicsState = false
+            end
+        else
+            if gardens then
+                for _, plot in ipairs(gardens:GetChildren()) do
+                    if plot:IsA("Instance") then
+                        if hiddenPlotsTracker[plot] then
+                            hiddenPlotsTracker[plot] = nil
+                            hideFolderContents(plot, false)
+                        end
+                        if lastPlantsState then
+                            hideFolderContents(plot:FindFirstChild("Plants"), false)
+                        end
+                        if lastSprinklersState then
+                            hideFolderContents(plot:FindFirstChild("Sprinklers"), false)
+                        end
+                    end
+                end
+            end
+            lastPlantsState = false
+            lastSprinklersState = false
+            lastGraphicsState = false
+        end
     end
 end)
 
