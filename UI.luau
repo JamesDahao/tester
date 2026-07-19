@@ -150,6 +150,8 @@ Decode.ThemeRegistry = {
     TextMuted = {}
 }
 
+Decode.LiveTogglesList = {}
+
 function Decode:RegisterObject(obj, themeKey)
     if not Decode.ThemeRegistry[themeKey] then return end
     table.insert(Decode.ThemeRegistry[themeKey], obj)
@@ -171,6 +173,9 @@ function Decode:RefreshTheme()
             Decode.Theme[themeKey] = currentColor
             for _, obj in ipairs(instances) do
                 if obj.Parent then
+                    if obj.Name == "ToggleSwitchBg" or obj.Name == "ToggleSliderNode" then
+                        continue
+                    end
                     if obj:IsA("UIStroke") then
                         obj.Color = currentColor
                     elseif themeKey:find("Text") then
@@ -181,6 +186,14 @@ function Decode:RefreshTheme()
                         obj.BackgroundColor3 = currentColor
                     end
                 end
+            end
+        end
+    end
+
+    if Decode.LiveTogglesList then
+        for _, toggleInstance in ipairs(Decode.LiveTogglesList) do
+            if toggleInstance.Frame and toggleInstance.Frame.Parent then
+                toggleInstance:UpdateVisualState()
             end
         end
     end
@@ -226,11 +239,6 @@ end
 local function rgbTableToHexStr(rgbTable)
     if type(rgbTable) ~= "table" or #rgbTable ~= 3 then return "0xFFFFFF" end
     return string.format("0x%02X%02X%02X", rgbTable[1], rgbTable[2], rgbTable[3])
-end
-
-local function rgbTableToHexNum(rgbTable)
-    if type(rgbTable) ~= "table" or #rgbTable ~= 3 then return 0xFFFFFF end
-    return (rgbTable[1] * 65536) + (rgbTable[2] * 256) + rgbTable[3]
 end
 
 local function saveConfig()
@@ -837,6 +845,7 @@ end
 function Decode:AddToggle(parentPage, toggleText, callback)
     local Temp = {}
     Temp.Frame = Instance.new("Frame")
+    Temp.Frame.Name = toggleText .. "_ToggleFrame"
     Temp.Frame.Size = UDim2.new(1, 0, 0, 36)
     Temp.Frame.BackgroundColor3 = Decode.Theme.ElementBackground
     Temp.Frame.BackgroundTransparency = 0.6
@@ -858,6 +867,7 @@ function Decode:AddToggle(parentPage, toggleText, callback)
     Temp.Label.Parent = Temp.Frame
 
     Temp.SwitchBg = Instance.new("Frame")
+    Temp.SwitchBg.Name = "ToggleSwitchBg"
     Temp.SwitchBg.Size = UDim2.new(0, 32, 0, 16)
     Temp.SwitchBg.Position = UDim2.new(1, -45, 0.5, -8)
     Temp.SwitchBg.BackgroundColor3 = Decode.Theme.MainBackground
@@ -868,6 +878,7 @@ function Decode:AddToggle(parentPage, toggleText, callback)
     Temp.SwitchCorner.Parent = Temp.SwitchBg
 
     Temp.SliderNode = Instance.new("Frame")
+    Temp.SliderNode.Name = "ToggleSliderNode"
     Temp.SliderNode.Size = UDim2.new(0, 12, 0, 12)
     Temp.SliderNode.Position = UDim2.new(0, 2, 0.5, -6)
     Temp.SliderNode.BackgroundColor3 = Decode.Theme.TextMuted
@@ -884,18 +895,33 @@ function Decode:AddToggle(parentPage, toggleText, callback)
     Temp.ClickBtn.Parent = Temp.Frame
 
     Temp.IsToggled = false
+
+    function Temp:UpdateVisualState()
+        if Temp.IsToggled then
+            Temp.SwitchBg.BackgroundColor3 = Decode.Theme.AccentColor
+            Temp.SliderNode.BackgroundColor3 = Decode.Theme.TextMain
+        else
+            Temp.SwitchBg.BackgroundColor3 = Decode.Theme.MainBackground
+            Temp.SliderNode.BackgroundColor3 = Decode.Theme.TextMuted
+        end
+    end
+
     Temp.ClickBtn.MouseButton1Click:Connect(function()
         Temp.IsToggled = not Temp.IsToggled
         local info = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
         if Temp.IsToggled then
-            TweenService:Create(Temp.SwitchBg, info, {BackgroundColor3 = Decode.Theme.AccentColor}):Play()
-            TweenService:Create(Temp.SliderNode, info, {Position = UDim2.new(1, -14, 0.5, -6), BackgroundColor3 = Decode.Theme.TextMain}):Play()
+            game:GetService("TweenService"):Create(Temp.SwitchBg, info, {BackgroundColor3 = Decode.Theme.AccentColor}):Play()
+            game:GetService("TweenService"):Create(Temp.SliderNode, info, {Position = UDim2.new(1, -14, 0.5, -6), BackgroundColor3 = Decode.Theme.TextMain}):Play()
         else
-            TweenService:Create(Temp.SwitchBg, info, {BackgroundColor3 = Decode.Theme.MainBackground}):Play()
-            TweenService:Create(Temp.SliderNode, info, {Position = UDim2.new(0, 2, 0.5, -6), BackgroundColor3 = Decode.Theme.TextMuted}):Play()
+            game:GetService("TweenService"):Create(Temp.SwitchBg, info, {BackgroundColor3 = Decode.Theme.MainBackground}):Play()
+            game:GetService("TweenService"):Create(Temp.SliderNode, info, {Position = UDim2.new(0, 2, 0.5, -6), BackgroundColor3 = Decode.Theme.TextMuted}):Play()
         end
         if callback then callback(Temp.IsToggled) end
     end)
+
+    if not Decode.LiveTogglesList then Decode.LiveTogglesList = {} end
+    table.insert(Decode.LiveTogglesList, Temp)
+
     return Temp
 end
 
