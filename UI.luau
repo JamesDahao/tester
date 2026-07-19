@@ -1,3 +1,4 @@
+-- 1
 local Decode = {}
 
 local CoreGui = game:GetService("CoreGui")
@@ -95,11 +96,17 @@ local Configurations = {
     TrowelPlantsFilter = {},
     TrowelSavedCFrame = nil,
     AutoTrowelToggleState = false,
-    DropTweenSpeed = 0,
+    DropTweenSpeed = 16,
     DropFruitsFilter = {},
     DropPetsFilter = {},
     AutoDropItemsEnabled = false,
-    CollectDroppedItemsEnabled = false
+    CollectDroppedItemsEnabled = false,
+    EspAboveWeightValue = 0,
+    EspFruitsFilter = {},
+    EspSprinklersFilter = {},
+    EspPlotModeSelection = "",
+    EspInventoryToggleState = false,
+    EspObjectsToggleState = false
 }
 
 local UI = {
@@ -1946,6 +1953,55 @@ UI.BuyAllPropsToggle = Decode:AddToggle(UI.ShopPropsDrop, "Buy All Props", funct
     end
 end)
 
+UI.EspDrop = Decode:CreateDropdown(UI.CreatedPages["Misc"], "ESP")
+
+Decode:AddLabel(UI.EspDrop, "- [ Configs ] -")
+
+UI.EspWeightSlider = Decode:AddSlider(UI.EspDrop, "Above Weight (Fruits)", Configurations.EspAboveWeightValue or 0, function(value)
+    Configurations.EspAboveWeightValue = value
+    saveConfig()
+end)
+
+Decode:AddLabel(UI.EspDrop, "- [ Options ] -")
+
+UI.EspFruitsSelector = Decode:AddSelector(UI.EspDrop, "Select Fruits", {}, function(chosen, selectorObj)
+    Configurations.EspFruitsFilter = Configurations.EspFruitsFilter or {}
+    local idx = table.find(Configurations.EspFruitsFilter, chosen)
+    if idx then table.remove(Configurations.EspFruitsFilter, idx) else table.insert(Configurations.EspFruitsFilter, chosen) end
+    saveConfig()
+    selectorObj:UpdateSelectionText(Configurations.EspFruitsFilter)
+end)
+
+UI.EspSprinklersSelector = Decode:AddSelector(UI.EspDrop, "Select Sprinklers", {}, function(chosen, selectorObj)
+    Configurations.EspSprinklersFilter = Configurations.EspSprinklersFilter or {}
+    local idx = table.find(Configurations.EspSprinklersFilter, chosen)
+    if idx then table.remove(Configurations.EspSprinklersFilter, idx) else table.insert(Configurations.EspSprinklersFilter, chosen) end
+    saveConfig()
+    selectorObj:UpdateSelectionText(Configurations.EspSprinklersFilter)
+end)
+
+UI.EspPlotSelector = Decode:AddSelector(UI.EspDrop, "Select Plot", {"Own Plot", "All Plots"}, function(chosen, selectorObj)
+    if selectorObj.SelectBtn.Text == chosen then
+        Configurations.EspPlotModeSelection = ""
+    else
+        Configurations.EspPlotModeSelection = chosen
+    end
+    saveConfig()
+    selectorObj:UpdateSelectionText(Configurations.EspPlotModeSelection)
+end)
+
+Decode:AddLabel(UI.EspDrop, "- [ Functions ] -")
+
+UI.EspInventoryToggle = Decode:AddToggle(UI.EspDrop, "ESP Inventory", function(state)
+    Configurations.EspInventoryToggleState = state
+    saveConfig()
+end)
+
+UI.EspObjectsToggle = Decode:AddToggle(UI.EspDrop, "ESP Fruits/Sprinklers", function(state)
+    Configurations.EspObjectsToggleState = state
+    saveConfig()
+end)
+
 task.spawn(function()
     task.wait(0.1)
 
@@ -2190,6 +2246,24 @@ task.spawn(function()
         UI.CollectDroppedToggle.SliderNode.Position = UDim2.new(1, -14, 0.5, -6)
         UI.CollectDroppedToggle.SliderNode.BackgroundColor3 = Decode.Theme.TextMain
     end
+
+    if Configurations.EspFruitsFilter then UI.EspFruitsSelector:UpdateSelectionText(Configurations.EspFruitsFilter) end
+    if Configurations.EspSprinklersFilter then UI.EspSprinklersSelector:UpdateSelectionText(Configurations.EspSprinklersFilter) end
+    if Configurations.EspPlotModeSelection and Configurations.EspPlotModeSelection ~= "" then UI.EspPlotSelector:UpdateSelectionText(Configurations.EspPlotModeSelection) end
+
+    if Configurations.EspInventoryToggleState and UI.EspInventoryToggle then
+        UI.EspInventoryToggle.IsToggled = true
+        UI.EspInventoryToggle.SwitchBg.BackgroundColor3 = Decode.Theme.AccentColor
+        UI.EspInventoryToggle.SliderNode.Position = UDim2.new(1, -14, 0.5, -6)
+        UI.EspInventoryToggle.SliderNode.BackgroundColor3 = Decode.Theme.TextMain
+    end
+
+    if Configurations.EspObjectsToggleState and UI.EspObjectsToggle then
+        UI.EspObjectsToggle.IsToggled = true
+        UI.EspObjectsToggle.SwitchBg.BackgroundColor3 = Decode.Theme.AccentColor
+        UI.EspObjectsToggle.SliderNode.Position = UDim2.new(1, -14, 0.5, -6)
+        UI.EspObjectsToggle.SliderNode.BackgroundColor3 = Decode.Theme.TextMain
+    end
 end)
 
 task.spawn(function()
@@ -2229,6 +2303,9 @@ task.spawn(function()
 
     if UI.DropFruitsSelector and UI.DropFruitsSelector.Populate then pcall(function() UI.DropFruitsSelector:Populate(FruitList) end) end
     if UI.DropPetsSelector and UI.DropPetsSelector.Populate then pcall(function() UI.DropPetsSelector:Populate(PetList) end) end
+
+    if UI.EspFruitsSelector and UI.EspFruitsSelector.Populate then pcall(function() UI.EspFruitsSelector:Populate(FruitList) end) end
+    if UI.EspSprinklersSelector and UI.EspSprinklersSelector.Populate then pcall(function() UI.EspSprinklersSelector:Populate(SprinklersList) end) end
 
     if UI.AuctionEggsSelector and UI.AuctionEggsSelector.Populate then pcall(function() UI.AuctionEggsSelector:Populate(EggsList) end) end
     if UI.AuctionSprinklersSelector and UI.AuctionSprinklersSelector.Populate then pcall(function() UI.AuctionSprinklersSelector:Populate(SprinklersList) end) end
