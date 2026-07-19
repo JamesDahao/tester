@@ -1,3 +1,4 @@
+-- test
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
@@ -2793,7 +2794,8 @@ task.spawn(function()
     while task.wait(1.5) do
         local Configs = _G.DecodeAPI and _G.DecodeAPI.Configs
         local isBoostActive = Configs and Configs.FpsBoostToggleState == true
-        local currentOption = Configs and Configs.FpsOptionSelection or ""
+        local currentOptions = Configs and Configs.FpsOptionSelection
+        local optionsTable = type(currentOptions) == "table" and currentOptions or {}
 
         local gardens = Workspace:FindFirstChild("Gardens")
 
@@ -2801,10 +2803,10 @@ task.spawn(function()
             if gardens then
                 local plots = gardens:GetChildren()
                 
-                local shouldHideMyPlot = (currentOption == "Remove My Plot")
-                local shouldHideOtherPlots = (currentOption == "Remove Other Plots")
-                local shouldHidePlants = (currentOption == "Hide All Plants")
-                local shouldHideSprinklers = (currentOption == "Hide All Sprinklers")
+                local shouldHideMyPlot = table.find(optionsTable, "Remove My Plot") ~= nil
+                local shouldHideOtherPlots = table.find(optionsTable, "Remove Other Plots") ~= nil
+                local shouldHidePlants = table.find(optionsTable, "Hide All Plants") ~= nil
+                local shouldHideSprinklers = table.find(optionsTable, "Hide All Sprinklers") ~= nil
 
                 local myUserId = LocalPlayer and LocalPlayer.UserId
                 local myName = LocalPlayer and LocalPlayer.Name
@@ -2846,8 +2848,7 @@ task.spawn(function()
                 lastPlantsState = shouldHidePlants
                 lastSprinklersState = shouldHideSprinklers
             end
-
-            if currentOption == "Lowest Graphics" then
+            if table.find(optionsTable, "Lowest Graphics") then
                 if not lastGraphicsState then
                     lastGraphicsState = true
                     
