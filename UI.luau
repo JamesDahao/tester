@@ -1,3 +1,4 @@
+-- test
 local Decode = {}
 
 local CoreGui = game:GetService("CoreGui")
@@ -2136,7 +2137,7 @@ local function numToRgbTable(num)
     return {r, g, b}
 end
 
-local function handleSliderHexInput(themeKey, numericValue)
+local function handleSliderHexInput(themeKey, numericValue, sliderObject)
     local rgbTable = numToRgbTable(numericValue)
     if themeKey == "MainBackground" then Configurations.MainHue = rgbTable
     elseif themeKey == "SidebarBackground" then Configurations.SidebarHue = rgbTable
@@ -2147,44 +2148,60 @@ local function handleSliderHexInput(themeKey, numericValue)
     end
     saveConfig()
     Decode:RefreshTheme()
+    
+    if sliderObject and sliderObject.ValueBox then
+        sliderObject.ValueBox.Text = string.format("0x%02X%02X%02X", rgbTable[1], rgbTable[2], rgbTable[3])
+    end
 end
 
-local function rgbTableToHexNum(rgbTable)
-    if type(rgbTable) ~= "table" or #rgbTable ~= 3 then return 0xFFFFFF end
-    return (rgbTable[1] * 65536) + (rgbTable[2] * 256) + rgbTable[3]
+local function rgbTableToHexStr(rgbTable)
+    if type(rgbTable) ~= "table" or #rgbTable ~= 3 then return "0xFFFFFF" end
+    return string.format("0x%02X%02X%02X", rgbTable[1], rgbTable[2], rgbTable[3])
 end
 
 UI.ThemeDrop = Decode:CreateDropdown(UI.CreatedPages["Settings"], "Theme")
 
 Decode:AddLabel(UI.ThemeDrop, "- [ Main Color ] -")
-Decode:AddSlider(UI.ThemeDrop, "Main Color Hex", rgbTableToHexNum(Configurations.MainHue), function(value)
-    handleSliderHexInput("MainBackground", value)
+local mainSlider
+mainSlider = Decode:AddSlider(UI.ThemeDrop, "Main Color Hex", 0, function(value)
+    handleSliderHexInput("MainBackground", value, mainSlider)
 end, "Type value like 0x0A121E")
+mainSlider.ValueBox.Text = rgbTableToHexStr(Configurations.MainHue)
 
 Decode:AddLabel(UI.ThemeDrop, "- [ Side Bar Color ] -")
-Decode:AddSlider(UI.ThemeDrop, "Sidebar Color Hex", rgbTableToHexNum(Configurations.SidebarHue), function(value)
-    handleSliderHexInput("SidebarBackground", value)
+local sidebarSlider
+sidebarSlider = Decode:AddSlider(UI.ThemeDrop, "Sidebar Color Hex", 0, function(value)
+    handleSliderHexInput("SidebarBackground", value, sidebarSlider)
 end, "Type value like 0x151B2C")
+sidebarSlider.ValueBox.Text = rgbTableToHexStr(Configurations.SidebarHue)
 
 Decode:AddLabel(UI.ThemeDrop, "- [ Accent Color ] -")
-Decode:AddSlider(UI.ThemeDrop, "Accent Color Hex", rgbTableToHexNum(Configurations.AccentHue), function(value)
-    handleSliderHexInput("AccentColor", value)
+local accentSlider
+accentSlider = Decode:AddSlider(UI.ThemeDrop, "Accent Color Hex", 0, function(value)
+    handleSliderHexInput("AccentColor", value, accentSlider)
 end, "Type value like 0x0EA5E9")
+accentSlider.ValueBox.Text = rgbTableToHexStr(Configurations.AccentHue)
 
 Decode:AddLabel(UI.ThemeDrop, "- [ Element Color ] -")
-Decode:AddSlider(UI.ThemeDrop, "Element Color Hex", rgbTableToHexNum(Configurations.ElementHue), function(value)
-    handleSliderHexInput("ElementBackground", value)
+local elementSlider
+elementSlider = Decode:AddSlider(UI.ThemeDrop, "Element Color Hex", 0, function(value)
+    handleSliderHexInput("ElementBackground", value, elementSlider)
 end, "Type value like 0x16263E")
+elementSlider.ValueBox.Text = rgbTableToHexStr(Configurations.ElementHue)
 
 Decode:AddLabel(UI.ThemeDrop, "- [ Main Text Color ] -")
-Decode:AddSlider(UI.ThemeDrop, "Main Text Hex", rgbTableToHexNum(Configurations.TextMainHue), function(value)
-    handleSliderHexInput("TextMain", value)
+local mainTextSlider
+mainTextSlider = Decode:AddSlider(UI.ThemeDrop, "Main Text Hex", 0, function(value)
+    handleSliderHexInput("TextMain", value, mainTextSlider)
 end, "Type value like 0xFFFFFF")
+mainTextSlider.ValueBox.Text = rgbTableToHexStr(Configurations.TextMainHue)
 
 Decode:AddLabel(UI.ThemeDrop, "- [ Muted Text Color ] -")
-Decode:AddSlider(UI.ThemeDrop, "Muted Text Hex", rgbTableToHexNum(Configurations.TextMutedHue), function(value)
-    handleSliderHexInput("TextMuted", value)
+local mutedTextSlider
+mutedTextSlider = Decode:AddSlider(UI.ThemeDrop, "Muted Text Hex", 0, function(value)
+    handleSliderHexInput("TextMuted", value, mutedTextSlider)
 end, "Type value like 0x8CA0B9")
+mutedTextSlider.ValueBox.Text = rgbTableToHexStr(Configurations.TextMutedHue)
 
 task.spawn(function()
     task.wait(0.1)
