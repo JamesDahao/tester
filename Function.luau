@@ -1,4 +1,4 @@
--- 1
+-- 2
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
@@ -2074,27 +2074,29 @@ task.spawn(function()
 end)
 
 pcall(function()
-    local controllerInstance = LocalPlayer:FindFirstChild("PlayerScripts")
-    controllerInstance = controllerInstance and controllerInstance:FindFirstChild("Controllers")
-    controllerInstance = controllerInstance and controllerInstance:FindFirstChild("GardenSyncController")
-    if controllerInstance and controllerInstance:IsA("ModuleScript") then
-        GardenSync = require(controllerInstance)
+    local localPlayer = game:GetService("Players").LocalPlayer
+    local pScripts = localPlayer:WaitForChild("PlayerScripts", 5)
+    local controllers = pScripts:WaitForChild("Controllers", 5)
+    local targetController = controllers:WaitForChild("GardenSyncController", 5)
+    if targetController and targetController:IsA("ModuleScript") then
+        local requireExecutor = _G.require or require
+        GardenSync = requireExecutor(targetController)
     end
 end)
 
 pcall(function()
-    local sharedFolder = game:GetService("ReplicatedStorage"):FindFirstChild("SharedModules")
-    local sprinklerMod = sharedFolder and sharedFolder:FindFirstChild("SprinklerData")
-    if sprinklerMod and sprinklerMod:IsA("ModuleScript") then
-        SprinklerData = require(sprinklerMod)
+    local repStorage = game:GetService("ReplicatedStorage")
+    local sModules = repStorage:WaitForChild("SharedModules", 5)
+    local targetData = sModules:WaitForChild("SprinklerData", 5)
+    if targetData and targetData:IsA("ModuleScript") then
+        local requireExecutor = _G.require or require
+        SprinklerData = requireExecutor(targetData)
     end
 end)
 
 local sprinklerInfo = {}
 for _, info in ipairs(SprinklerData) do
-    if type(info) == "table" and info.SprinklerName then
-        sprinklerInfo[info.SprinklerName] = info
-    end
+    sprinklerInfo[info.SprinklerName] = info
 end
 
 local function formatTime(sec)
@@ -2158,24 +2160,16 @@ end
 
 local function checkIsWhitelisted(category, itemName, currentMutation)
     if not itemName or itemName == "" then return false end
-    local Configs = _G.DecodeAPI and _G.DecodeAPI.Configs
-    if not Configs then return false end
-    
-    local cleanItemName = tostring(itemName):lower():gsub("%s+", ""):gsub("_+", ""):gsub("-+", "")
-    
-    if category == "Plants" and Configs.EspFruitsFilter then
-        for _, filterValue in ipairs(Configs.EspFruitsFilter) do
-            local cleanFilter = tostring(filterValue):lower():gsub("%s+", ""):gsub("_+", ""):gsub("-+", "")
-            if cleanItemName == cleanFilter or cleanItemName:find(cleanFilter, 1, true) or cleanFilter:find(cleanItemName, 1, true) then
-                return true
-            end
+    local configurationsTable = _G.DecodeAPI and _G.DecodeAPI.Configs
+    if type(configurationsTable) ~= "table" then return false end
+
+    if category == "Plants" and configurationsTable.EspFruitsFilter then
+        if table.find(configurationsTable.EspFruitsFilter, itemName) then
+            return true
         end
-    elseif category == "Sprinklers" and Configs.EspSprinklersFilter then
-        for _, filterValue in ipairs(Configs.EspSprinklersFilter) do
-            local cleanFilter = tostring(filterValue):lower():gsub("%s+", ""):gsub("_+", ""):gsub("-+", "")
-            if cleanItemName == cleanFilter or cleanItemName:find(cleanFilter, 1, true) or cleanFilter:find(cleanItemName, 1, true) then
-                return true
-            end
+    elseif category == "Sprinklers" and configurationsTable.EspSprinklersFilter then
+        if table.find(configurationsTable.EspSprinklersFilter, itemName) then
+            return true
         end
     end
     
@@ -2183,7 +2177,7 @@ local function checkIsWhitelisted(category, itemName, currentMutation)
 end
 
 local function getESPCropWeightKg(instanceObject)
-    local plantModules = ReplicatedStorage:FindFirstChild("PlantGenerationModules")
+    local plantModules = game:GetService("ReplicatedStorage"):FindFirstChild("PlantGenerationModules")
     if not plantModules then return 0 end
     local kg = 0
 
@@ -2241,9 +2235,9 @@ end
 task.spawn(function()
     while true do
         task.wait(1)
-        local Configs = _G.DecodeAPI and _G.DecodeAPI.Configs
+        local configurationsTable = _G.DecodeAPI and _G.DecodeAPI.Configs
 
-        if not Configs or not Configs.EspObjectsToggleState then
+        if not configurationsTable or not configurationsTable.EspObjectsToggleState then
             local gardensFolder = workspace:FindFirstChild("Gardens")
             if gardensFolder then
                 for _, plot in ipairs(gardensFolder:GetChildren()) do
@@ -2276,14 +2270,13 @@ task.spawn(function()
             continue
         end
 
-        local rawMode = tostring(Configs.EspPlotModeSelection or ""):upper():gsub("%s+", "")
+        local rawModeSelection = tostring(configurationsTable.EspPlotModeSelection or ""):upper()
         local targetMode = "ALL PLOTS"
-        
-        if string.find(rawMode, "OWN") or string.find(rawMode, "PLOT") and not string.find(rawMode, "ALL") then
+        if string.find(rawModeSelection, "OWN") then
             targetMode = "OWN PLOTS"
         end
-        
-        local minWeightThreshold = tonumber(Configs.EspAboveWeightValue) or 0
+
+        local minWeightThreshold = tonumber(configurationsTable.EspAboveWeightValue) or 0
         local ownPlotId = LocalPlayer:GetAttribute("PlotId")
         local ownPlotName = ownPlotId and ("Plot" .. tostring(ownPlotId)) or nil
 
@@ -2292,25 +2285,25 @@ task.spawn(function()
 
         local syncedData = {}
         pcall(function()
-            if GardenSync and LocalPlayer then
-                syncedData[tostring(LocalPlayer.UserId)] = GardenSync:GetSprinklers(LocalPlayer.UserId)
-                if targetMode == "ALL PLOTS" then
-                    for _, p in ipairs(Players:GetPlayers()) do
-                        if p then
-                            syncedData[tostring(p.UserId)] = GardenSync:GetSprinklers(p.UserId)
-                        end
-                    end
+            syncedData[tostring(LocalPlayer.UserId)] = GardenSync:GetSprinklers(LocalPlayer.UserId)
+            if targetMode == "ALL PLOTS" then
+                for _, p in ipairs(game:GetService("Players"):GetPlayers()) do
+                    syncedData[tostring(p.UserId)] = GardenSync:GetSprinklers(p.UserId)
                 end
             end
         end)
 
         for _, plot in ipairs(gardensFolder:GetChildren()) do
-            if plot.Name:sub(1, 4) == "Plot" then
+            if plot.Name:sub(1, 4) == "Plot" or string.find(string.lower(plot.Name), string.lower(LocalPlayer.Name)) then
                 local isAllowedTarget = false
                 if targetMode == "ALL PLOTS" then
                     isAllowedTarget = true
-                elseif targetMode == "OWN PLOTS" and ownPlotName and plot.Name == ownPlotName then
-                    isAllowedTarget = true
+                elseif targetMode == "OWN PLOTS" then
+                    if ownPlotName and plot.Name == ownPlotName then
+                        isAllowedTarget = true
+                    elseif string.find(string.lower(plot.Name), string.lower(LocalPlayer.Name)) then
+                        isAllowedTarget = true
+                    end
                 end
 
                 local folder = plot:FindFirstChild("Sprinklers")
@@ -2330,7 +2323,7 @@ task.spawn(function()
                             local pData = syncedData[sUid]
                             if pData and pData[sId] then
                                 local cfg = sprinklerInfo[sName]
-                                if cfg and cfg.Lifetime then
+                                if cfg then
                                     remaining = math.max(0, cfg.Lifetime - (os.time() - pData[sId].PlacedAt))
                                 end
                             end
@@ -2361,19 +2354,13 @@ task.spawn(function()
 
                         if isAllowedTarget and (isWhitelisted or hasFruits) then
                             local weight = getESPCropWeightKg(plantModel)
-                            
-                            -- Immediate display bypass trigger conditions if the name is explicitly checked on your UI menu panel
-                            if isWhitelisted or (weight >= minWeightThreshold and weight > 0.05) then
+
+                            if weight >= minWeightThreshold and weight > 0.05 then
                                 local gui = getBillboard(plantModel, "DebugPlantFruitESP", Color3.fromRGB(255, 215, 0))
                                 if gui then
                                     gui.Enabled = true
                                     local displayMut = (mutation ~= "None" and mutation ~= "") and (" [" .. mutation .. "]") or ""
-                                    
-                                    if weight > 0.05 then
-                                        gui.Timer.Text = string.format("%s%s\n%.2f kg", seedName, displayMut, weight)
-                                    else
-                                        gui.Timer.Text = string.format("%s%s\n[Loading...]", seedName, displayMut)
-                                    end
+                                    gui.Timer.Text = string.format("%s%s\n%.2f kg", seedName, displayMut, weight)
                                 end
                             else
                                 local part = plantModel.PrimaryPart or plantModel:FindFirstChildWhichIsA("BasePart")
@@ -2389,12 +2376,15 @@ task.spawn(function()
                                 for _, fruitModel in ipairs(fruitsSubFolder:GetChildren()) do
                                     local fPart = fruitModel.PrimaryPart or fruitModel:FindFirstChildWhichIsA("BasePart")
                                     local fGui = fPart and fPart:FindFirstChild("DebugPlantFruitESP") or fruitModel:FindFirstChild("DebugPlantFruitESP")
-                                    if fGui then fGui:Destroy() end
+                                    if fGui then 
+                                        fGui:Destroy() 
+                                    end
                                 end
                             end
                         end
                     end
                 end
+
             end
         end
     end
