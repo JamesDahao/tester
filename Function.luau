@@ -1,4 +1,4 @@
--- 2
+-- 1
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
@@ -2361,13 +2361,19 @@ task.spawn(function()
 
                         if isAllowedTarget and (isWhitelisted or hasFruits) then
                             local weight = getESPCropWeightKg(plantModel)
-
-                            if weight >= minWeightThreshold and weight > 0.05 then
+                            
+                            -- Immediate display bypass trigger conditions if the name is explicitly checked on your UI menu panel
+                            if isWhitelisted or (weight >= minWeightThreshold and weight > 0.05) then
                                 local gui = getBillboard(plantModel, "DebugPlantFruitESP", Color3.fromRGB(255, 215, 0))
                                 if gui then
                                     gui.Enabled = true
                                     local displayMut = (mutation ~= "None" and mutation ~= "") and (" [" .. mutation .. "]") or ""
-                                    gui.Timer.Text = string.format("%s%s\n%.2f kg", seedName, displayMut, weight)
+                                    
+                                    if weight > 0.05 then
+                                        gui.Timer.Text = string.format("%s%s\n%.2f kg", seedName, displayMut, weight)
+                                    else
+                                        gui.Timer.Text = string.format("%s%s\n[Loading...]", seedName, displayMut)
+                                    end
                                 end
                             else
                                 local part = plantModel.PrimaryPart or plantModel:FindFirstChildWhichIsA("BasePart")
@@ -2389,7 +2395,6 @@ task.spawn(function()
                         end
                     end
                 end
-
             end
         end
     end
