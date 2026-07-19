@@ -107,8 +107,22 @@ local Configurations = {
     EspInventoryToggleState = false,
     EspObjectsToggleState = false,
     FpsOptionSelection = {},
-    FpsBoostToggleState = false
+    FpsBoostToggleState = false,
+    
+    MainHue = {10, 18, 30},
+    SidebarHue = {15, 27, 44},
+    AccentHue = {14, 165, 233},
+    ElementHue = {22, 38, 62},
+    TextMainHue = {255, 255, 255},
+    TextMutedHue = {140, 160, 185}
 }
+
+if type(Configurations.MainHue) ~= "table" then Configurations.MainHue = {10, 18, 30} end
+if type(Configurations.SidebarHue) ~= "table" then Configurations.SidebarHue = {15, 27, 44} end
+if type(Configurations.AccentHue) ~= "table" then Configurations.AccentHue = {14, 165, 233} end
+if type(Configurations.ElementHue) ~= "table" then Configurations.ElementHue = {22, 38, 62} end
+if type(Configurations.TextMainHue) ~= "table" then Configurations.TextMainHue = {255, 255, 255} end
+if type(Configurations.TextMutedHue) ~= "table" then Configurations.TextMutedHue = {140, 160, 185} end
 
 local UI = {
     Tabs = {},
@@ -119,13 +133,99 @@ local UI = {
 }
 
 Decode.Theme = {
-    MainBackground = Color3.fromRGB(10, 18, 30),
-    SidebarBackground = Color3.fromRGB(15, 27, 44),
-    AccentColor = Color3.fromRGB(14, 165, 233),
-    ElementBackground = Color3.fromRGB(22, 38, 62),
-    TextMain = Color3.fromRGB(255, 255, 255),
-    TextMuted = Color3.fromRGB(140, 160, 185)
+    MainBackground = Color3.fromRGB(unpack(Configurations.MainHue)),
+    SidebarBackground = Color3.fromRGB(unpack(Configurations.SidebarHue)),
+    AccentColor = Color3.fromRGB(unpack(Configurations.AccentHue)),
+    ElementBackground = Color3.fromRGB(unpack(Configurations.ElementHue)),
+    TextMain = Color3.fromRGB(unpack(Configurations.TextMainHue)),
+    TextMuted = Color3.fromRGB(unpack(Configurations.TextMutedHue))
 }
+
+Decode.ThemeRegistry = {
+    MainBackground = {},
+    SidebarBackground = {},
+    AccentColor = {},
+    ElementBackground = {},
+    TextMain = {},
+    TextMuted = {}
+}
+
+function Decode:RegisterObject(obj, themeKey)
+    if not Decode.ThemeRegistry[themeKey] then return end
+    table.insert(Decode.ThemeRegistry[themeKey], obj)
+end
+
+function Decode:RefreshTheme()
+    local colorMapping = {
+        MainBackground = Color3.fromRGB(unpack(Configurations.MainHue)),
+        SidebarBackground = Color3.fromRGB(unpack(Configurations.SidebarHue)),
+        AccentColor = Color3.fromRGB(unpack(Configurations.AccentHue)),
+        ElementBackground = Color3.fromRGB(unpack(Configurations.ElementHue)),
+        TextMain = Color3.fromRGB(unpack(Configurations.TextMainHue)),
+        TextMuted = Color3.fromRGB(unpack(Configurations.TextMutedHue))
+    }
+
+    for themeKey, instances in pairs(Decode.ThemeRegistry) do
+        local currentColor = colorMapping[themeKey]
+        if currentColor then
+            Decode.Theme[themeKey] = currentColor
+            for _, obj in ipairs(instances) do
+                if obj.Parent then
+                    if obj:IsA("UIStroke") then
+                        obj.Color = currentColor
+                    elseif themeKey:find("Text") then
+                        if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
+                            obj.TextColor3 = currentColor
+                        end
+                    elseif obj:IsA("GuiObject") then
+                        obj.BackgroundColor3 = currentColor
+                    end
+                end
+            end
+        end
+    end
+end
+
+local function autoRegisterUI(instanceObject)
+    local mainColor = Color3.fromRGB(unpack(Configurations.MainHue))
+    local sidebarColor = Color3.fromRGB(unpack(Configurations.SidebarHue))
+    local accentColor = Color3.fromRGB(unpack(Configurations.AccentHue))
+    local elementColor = Color3.fromRGB(unpack(Configurations.ElementHue))
+    local textMainColor = Color3.fromRGB(unpack(Configurations.TextMainHue))
+    local textMutedColor = Color3.fromRGB(unpack(Configurations.TextMutedHue))
+
+    local function scan(obj)
+        if obj:IsA("UIStroke") then
+            if obj.Color == mainColor then Decode:RegisterObject(obj, "MainBackground")
+            elseif obj.Color == sidebarColor then Decode:RegisterObject(obj, "SidebarBackground")
+            elseif obj.Color == accentColor then Decode:RegisterObject(obj, "AccentColor")
+            elseif obj.Color == elementColor then Decode:RegisterObject(obj, "ElementBackground")
+            end
+        elseif obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
+            if obj.TextColor3 == textMainColor then Decode:RegisterObject(obj, "TextMain")
+            elseif obj.TextColor3 == textMutedColor then Decode:RegisterObject(obj, "TextMuted")
+            end
+            if obj.BackgroundColor3 == mainColor then Decode:RegisterObject(obj, "MainBackground")
+            elseif obj.BackgroundColor3 == sidebarColor then Decode:RegisterObject(obj, "SidebarBackground")
+            elseif obj.BackgroundColor3 == accentColor then Decode:RegisterObject(obj, "AccentColor")
+            elseif obj.BackgroundColor3 == elementColor then Decode:RegisterObject(obj, "ElementBackground")
+            end
+        elseif obj:IsA("GuiObject") then
+            if obj.BackgroundColor3 == mainColor then Decode:RegisterObject(obj, "MainBackground")
+            elseif obj.BackgroundColor3 == sidebarColor then Decode:RegisterObject(obj, "SidebarBackground")
+            elseif obj.BackgroundColor3 == accentColor then Decode:RegisterObject(obj, "AccentColor")
+            elseif obj.BackgroundColor3 == elementColor then Decode:RegisterObject(obj, "ElementBackground")
+            end
+        end
+        
+        local children = obj:GetChildren()
+        for i = 1, #children do
+            scan(children[i])
+        end
+    end
+
+    scan(instanceObject)
+end
 
 local function saveConfig()
     local success, str = pcall(function()
@@ -2028,6 +2128,71 @@ UI.FpsBoostToggle = Decode:AddToggle(UI.FpsDrop, "FPS Boost", function(state)
     saveConfig()
 end)
 
+local function hexToColor3(hex)
+    hex = hex:gsub("#", "")
+    if #hex ~= 6 then return nil end
+    local r = tonumber(hex:sub(1, 2), 16)
+    local g = tonumber(hex:sub(3, 4), 16)
+    local b = tonumber(hex:sub(5, 6), 16)
+    if r and g and b then
+        return Color3.fromRGB(r, g, b)
+    end
+    return nil
+end
+
+local function handleHexInput(themeKey, hexString, selectorObj)
+    local newColor = hexToColor3(hexString)
+    if newColor then
+        local rgbTable = {math.floor(newColor.R * 255), math.floor(newColor.G * 255), math.floor(newColor.B * 255)}
+        if themeKey == "MainBackground" then Configurations.MainHue = rgbTable
+        elseif themeKey == "SidebarBackground" then Configurations.SidebarHue = rgbTable
+        elseif themeKey == "AccentColor" then Configurations.AccentHue = rgbTable
+        elseif themeKey == "ElementBackground" then Configurations.ElementHue = rgbTable
+        elseif themeKey == "TextMain" then Configurations.TextMainHue = rgbTable
+        elseif themeKey == "TextMuted" then Configurations.TextMutedHue = rgbTable
+        end
+        saveConfig()
+        Decode:RefreshTheme()
+        if selectorObj and selectorObj.UpdateSelectionText then
+            selectorObj:UpdateSelectionText(hexString)
+        end
+    end
+end
+
+UI.ThemeDrop = Decode:CreateDropdown(UI.CreatedPages["Settings"], "Theme")
+
+local presetHexes = {"#0A121E", "#0F1B2C", "#0EA5E9", "#16263E", "#FFFFFF", "#8CA0B9", "#FF0000", "#00FF00", "#0000FF"}
+
+Decode:AddLabel(UI.ThemeDrop, "- [ Main Color ] -")
+UI.MainColorHex = Decode:AddSelector(UI.ThemeDrop, "Paste Hex (#0A121E)", presetHexes, function(chosen, selectorObj)
+    handleHexInput("MainBackground", chosen, selectorObj)
+end)
+
+Decode:AddLabel(UI.ThemeDrop, "- [ Side Bar Color ] -")
+UI.SidebarColorHex = Decode:AddSelector(UI.ThemeDrop, "Paste Hex (#151B2C)", presetHexes, function(chosen, selectorObj)
+    handleHexInput("SidebarBackground", chosen, selectorObj)
+end)
+
+Decode:AddLabel(UI.ThemeDrop, "- [ Accent Color ] -")
+UI.AccentColorHex = Decode:AddSelector(UI.ThemeDrop, "Paste Hex (#0EA5E9)", presetHexes, function(chosen, selectorObj)
+    handleHexInput("AccentColor", chosen, selectorObj)
+end)
+
+Decode:AddLabel(UI.ThemeDrop, "- [ Element Color ] -")
+UI.ElementColorHex = Decode:AddSelector(UI.ThemeDrop, "Paste Hex (#16263E)", presetHexes, function(chosen, selectorObj)
+    handleHexInput("ElementBackground", chosen, selectorObj)
+end)
+
+Decode:AddLabel(UI.ThemeDrop, "- [ Main Text Color ] -")
+UI.MainTextColorHex = Decode:AddSelector(UI.ThemeDrop, "Paste Hex (#FFFFFF)", presetHexes, function(chosen, selectorObj)
+    handleHexInput("TextMain", chosen, selectorObj)
+end)
+
+Decode:AddLabel(UI.ThemeDrop, "- [ Muted Text Color ] -")
+UI.MutedTextColorHex = Decode:AddSelector(UI.ThemeDrop, "Paste Hex (#8CA0B9)", presetHexes, function(chosen, selectorObj)
+    handleHexInput("TextMuted", chosen, selectorObj)
+end)
+
 task.spawn(function()
     task.wait(0.1)
 
@@ -2483,7 +2648,7 @@ function Decode:Init()
     end
 end
 
-
+autoRegisterUI(UI.ScreenGui)
 print("Decode: UI Loaded.")
 Decode:Init()
 return Decode
