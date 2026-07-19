@@ -117,13 +117,6 @@ local Configurations = {
     TextMutedHue = {140, 160, 185}
 }
 
-if type(Configurations.MainHue) ~= "table" then Configurations.MainHue = {10, 18, 30} end
-if type(Configurations.SidebarHue) ~= "table" then Configurations.SidebarHue = {15, 27, 44} end
-if type(Configurations.AccentHue) ~= "table" then Configurations.AccentHue = {14, 165, 233} end
-if type(Configurations.ElementHue) ~= "table" then Configurations.ElementHue = {22, 38, 62} end
-if type(Configurations.TextMainHue) ~= "table" then Configurations.TextMainHue = {255, 255, 255} end
-if type(Configurations.TextMutedHue) ~= "table" then Configurations.TextMutedHue = {140, 160, 185} end
-
 local UI = {
     Tabs = {},
     FirstTab = nil,
@@ -131,6 +124,19 @@ local UI = {
     CreatedPages = {},
     PlayerTracker = { OriginalSpeed = 16 }
 }
+
+local function numToRgbTable(num)
+    if not num then return {255, 255, 255} end
+    local r = math.floor(num / 65536) % 256
+    local g = math.floor(num / 256) % 256
+    local b = num % 256
+    return {r, g, b}
+end
+
+local function rgbTableToHexStr(rgbTable)
+    if type(rgbTable) ~= "table" or #rgbTable ~= 3 then return "0xFFFFFF" end
+    return string.format("0x%02X%02X%02X", rgbTable[1], rgbTable[2], rgbTable[3])
+end
 
 Decode.Theme = {
     MainBackground = Color3.fromRGB(unpack(Configurations.MainHue)),
@@ -228,19 +234,6 @@ local function autoRegisterUI(instanceObject)
     scan(instanceObject)
 end
 
-local function numToRgbTable(num)
-    if not num then return {255, 255, 255} end
-    local r = math.floor(num / 65536) % 256
-    local g = math.floor(num / 256) % 256
-    local b = num % 256
-    return {r, g, b}
-end
-
-local function rgbTableToHexStr(rgbTable)
-    if type(rgbTable) ~= "table" or #rgbTable ~= 3 then return "0xFFFFFF" end
-    return string.format("0x%02X%02X%02X", rgbTable[1], rgbTable[2], rgbTable[3])
-end
-
 local function saveConfig()
     local success, str = pcall(function()
         return HttpService:JSONEncode(Configurations)
@@ -290,7 +283,7 @@ local function handleSliderHexInput(themeKey, numericValue, sliderObject)
     elseif themeKey == "TextMain" then Configurations.TextMainHue = rgbTable
     elseif themeKey == "TextMuted" then Configurations.TextMutedHue = rgbTable
     end
-    if saveConfig then saveConfig() end
+    saveConfig()
     
     Decode.ThemeRegistry = {MainBackground = {}, SidebarBackground = {}, AccentColor = {}, ElementBackground = {}, TextMain = {}, TextMuted = {}}
     if UI and UI.ScreenGui then autoRegisterUI(UI.ScreenGui) end
@@ -2498,6 +2491,17 @@ task.spawn(function()
         UI.FpsBoostToggle.SwitchBg.BackgroundColor3 = Decode.Theme.AccentColor
         UI.FpsBoostToggle.SliderNode.Position = UDim2.new(1, -14, 0.5, -6)
         UI.FpsBoostToggle.SliderNode.BackgroundColor3 = Decode.Theme.TextMain
+    end
+
+    if UI and UI.ScreenGui then
+        autoRegisterUI(UI.ScreenGui)
+        Decode:RefreshTheme()
+        if mainSlider then mainSlider.ValueBox.Text = rgbTableToHexStr(Configurations.MainHue) end
+        if sidebarSlider then sidebarSlider.ValueBox.Text = rgbTableToHexStr(Configurations.SidebarHue) end
+        if accentSlider then accentSlider.ValueBox.Text = rgbTableToHexStr(Configurations.AccentHue) end
+        if elementSlider then elementSlider.ValueBox.Text = rgbTableToHexStr(Configurations.ElementHue) end
+        if mainTextSlider then mainTextSlider.ValueBox.Text = rgbTableToHexStr(Configurations.TextMainHue) end
+        if mutedTextSlider then mutedTextSlider.ValueBox.Text = rgbTableToHexStr(Configurations.TextMutedHue) end
     end
 end)
 
