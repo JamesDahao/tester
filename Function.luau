@@ -1,3 +1,4 @@
+-- 1
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
@@ -2599,12 +2600,38 @@ end)
 local function applyPriceSweeper()
     local Configs = _G.DecodeAPI and _G.DecodeAPI.Configs
     local isEnabled = Configs and Configs.EspInventoryToggleState == true
-    if not isEnabled then return end
     
     local clientGui = LocalPlayer:FindFirstChild("PlayerGui")
     local backpack = LocalPlayer:FindFirstChild("Backpack")
     local character = LocalPlayer.Character
     if not clientGui then return end
+
+    if not isEnabled then
+        local guis = clientGui:GetChildren()
+        for g = 1, #guis do
+            local screenGui = guis[g]
+            if screenGui:IsA("ScreenGui") then
+                local descendants = screenGui:GetDescendants()
+                for d = 1, #descendants do
+                    local descendant = descendants[d]
+                    if descendant:IsA("TextLabel") and descendant.Name == "InventoryPriceOverlay" then
+                        descendant.Visible = false
+                    end
+                end
+            end
+        end
+        
+        local backpackGui = clientGui:FindFirstChild("BackpackGui")
+        local backpackFrame = backpackGui and backpackGui:FindFirstChild("Backpack")
+        local hotbar = backpackFrame and backpackFrame:FindFirstChild("Hotbar")
+        if hotbar then
+            local totalLabel = hotbar:FindFirstChild("HotbarTotalValueLabel")
+            if totalLabel then totalLabel.Visible = false end
+            local alertLabel = hotbar:FindFirstChild("HotbarMultiAlertLabel")
+            if alertLabel then alertLabel.Visible = false end
+        end
+        return
+    end
     
     local runningInventoryTotalValue = 0
     local accountedFruitIds = {}
